@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -42,11 +43,13 @@ import androidx.compose.ui.unit.dp
 import com.example.budgetapptracker.ui.home.HomeAction
 import com.example.budgetapptracker.ui.theme.LocalAppColors
 import com.example.budgetapptracker.ui.home.HomeScreen
+import com.example.budgetapptracker.ui.insights.InsightsScreen
 import com.example.budgetapptracker.ui.transactions.TransactionsScreen
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
     Activity("Activity", Icons.AutoMirrored.Rounded.ReceiptLong),
+    Insights("Insights", Icons.Rounded.Insights),
 }
 
 @Composable
@@ -76,6 +79,7 @@ fun AppRoot() {
                         onActionHandled = { pendingAction = null },
                     )
                     Tab.Activity -> TransactionsScreen()
+                    Tab.Insights -> InsightsScreen()
                 }
             }
         }
@@ -95,11 +99,16 @@ private fun BottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 32.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BarItem(tab = Tab.Home, selected = selected == Tab.Home, onClick = { onSelect(Tab.Home) })
+            BarItem(
+                tab = Tab.Activity,
+                selected = selected == Tab.Activity,
+                onClick = { onSelect(Tab.Activity) },
+            )
 
             Box {
                 Box(
@@ -131,9 +140,9 @@ private fun BottomBar(
             }
 
             BarItem(
-                tab = Tab.Activity,
-                selected = selected == Tab.Activity,
-                onClick = { onSelect(Tab.Activity) },
+                tab = Tab.Insights,
+                selected = selected == Tab.Insights,
+                onClick = { onSelect(Tab.Insights) },
             )
         }
     }
@@ -148,7 +157,7 @@ private fun BarItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(imageVector = tab.icon, contentDescription = null, tint = color)

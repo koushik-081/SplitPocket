@@ -15,9 +15,10 @@ class BudgetRepository(private val dao: BudgetDao) {
         month: YearMonth,
         categoryId: String?,
         uncategorisedOnly: Boolean,
+        hidden: Boolean = false,
     ): Flow<List<TransactionRow>> {
         val (from, until) = month.toEpochRange()
-        return dao.observeTransactions(from, until, categoryId, uncategorisedOnly)
+        return dao.observeTransactions(from, until, categoryId, uncategorisedOnly, hidden)
     }
 
     fun observeIncomeTotal(month: YearMonth): Flow<Long> {
@@ -26,7 +27,7 @@ class BudgetRepository(private val dao: BudgetDao) {
     }
 
     fun observeSince(from: Long): Flow<List<TransactionRow>> =
-        dao.observeTransactions(from, Long.MAX_VALUE, null, false)
+        dao.observeTransactions(from, Long.MAX_VALUE, null, false, false)
 
     suspend fun addCategory(name: String, budgetPaise: Long) {
         dao.insertCategory(CategoryEntity(name = name.trim(), monthlyBudgetPaise = budgetPaise))
@@ -76,11 +77,18 @@ class BudgetRepository(private val dao: BudgetDao) {
         rememberPayee: Boolean,
     ) {
         dao.setTransactionCategory(transactionId, categoryId)
+        val key = merchant.uppercase()
         if (rememberPayee) {
-            val key = merchant.uppercase()
             dao.upsertRule(MerchantRuleEntity(merchant = key, categoryId = categoryId))
             dao.categoriseUncategorised(key, categoryId)
+        } else {
+            // Saving with the switch off forgets any earlier rule for this payee.
+            dao.deleteRule(key)
         }
+    }
+
+    suspend fun restoreTransaction(id: String) {
+        dao.restoreTransaction(id)
     }
 
     suspend fun removeTransaction(id: String) {

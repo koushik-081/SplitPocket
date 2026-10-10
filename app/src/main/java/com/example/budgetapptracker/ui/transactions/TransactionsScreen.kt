@@ -17,14 +17,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -74,6 +81,7 @@ fun TransactionsScreen(
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val selected by viewModel.filter.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     var openTransaction by remember { mutableStateOf<TransactionRow?>(null) }
 
@@ -114,6 +122,24 @@ fun TransactionsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.search(it) },
+                placeholder = { Text("Search by place") },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.search("") }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = CircleShape,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -139,6 +165,13 @@ fun TransactionsScreen(
                         label = { Text(category.name) },
                     )
                 }
+                item {
+                    FilterChip(
+                        selected = selected == TransactionsViewModel.HIDDEN,
+                        onClick = { viewModel.selectFilter(TransactionsViewModel.HIDDEN) },
+                        label = { Text("Hidden") },
+                    )
+                }
             }
 
             Text(
@@ -150,8 +183,11 @@ fun TransactionsScreen(
             if (transactions.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (selected == TransactionsViewModel.INBOX) "Inbox is empty. Everything is categorised."
-                        else "No spending recorded here yet"
+                        when (selected) {
+                            TransactionsViewModel.INBOX -> "Inbox is empty. Everything is categorised."
+                            TransactionsViewModel.HIDDEN -> "Nothing is hidden."
+                            else -> "No spending recorded here yet"
+                        }
                     )
                 }
             } else {
@@ -179,19 +215,41 @@ fun TransactionsScreen(
     }
 
     openTransaction?.let { target ->
-        AssignDialog(
-            transaction = target,
-            categories = categories,
-            onDismiss = { openTransaction = null },
-            onAssign = { categoryId, rememberPayee ->
-                viewModel.assign(target, categoryId, rememberPayee)
-                openTransaction = null
-            },
-            onRemove = {
-                viewModel.remove(target.id)
-                openTransaction = null
-            },
-        )
+        if (selected == TransactionsViewModel.HIDDEN) {
+            AlertDialog(
+                onDismissRequest = { openTransaction = null },
+                title = { Text("Restore this expense?") },
+                text = {
+                    Text(
+                        "${target.merchant} · ${target.amountPaise.toRupeeString()}\n\n" +
+                            "It was marked as not an expense. Restoring puts it back in your Inbox."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.restore(target.id)
+                        openTransaction = null
+                    }) { Text("Restore") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { openTransaction = null }) { Text("Cancel") }
+                },
+            )
+        } else {
+            AssignDialog(
+                transaction = target,
+                categories = categories,
+                onDismiss = { openTransaction = null },
+                onAssign = { categoryId, rememberPayee ->
+                    viewModel.assign(target, categoryId, rememberPayee)
+                    openTransaction = null
+                },
+                onRemove = {
+                    viewModel.remove(target.id)
+                    openTransaction = null
+                },
+            )
+        }
     }
 }
 
@@ -206,7 +264,11 @@ private fun AssignDialog(
     val canRemember = transaction.merchant != UNKNOWN_MERCHANT
     var selectedId by remember { mutableStateOf(transaction.categoryId) }
     var rememberPayee by remember {
-        mutableStateOf(canRemember && !looksLikePerson(transaction.merchant))
+        mutableStateOf(
+            // Already categorised: show what is saved. New: guess from the payee's name.
+            if (transaction.categoryId != null) transaction.remembered
+            else canRemember && !looksLikePerson(transaction.merchant)
+        )
     }
 
     AlertDialog(

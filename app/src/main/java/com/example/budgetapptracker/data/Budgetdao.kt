@@ -23,6 +23,8 @@ data class TransactionRow(
     val source: String,
     val categoryId: String?,
     val categoryName: String?,
+    // True when "Remember for this payee" is saved for this merchant.
+    val remembered: Boolean,
 )
 
 @Dao
@@ -67,6 +69,12 @@ interface BudgetDao {
     )
     suspend fun excludeSmsTransaction(id: String)
 
+    @Query("UPDATE transactions SET excluded = 0 WHERE id = :id")
+    suspend fun restoreTransaction(id: String)
+
+    @Query("DELETE FROM merchant_rules WHERE merchant = :merchant")
+    suspend fun deleteRule(merchant: String)
+
     @Query("UPDATE categories SET monthlyBudgetPaise = :budgetPaise WHERE id = :id")
     suspend fun updateCategoryBudget(id: String, budgetPaise: Long)
 
@@ -96,11 +104,12 @@ interface BudgetDao {
     @Query(
         """
         SELECT t.id, t.amountPaise, t.merchant, t.occurredAt, t.source, t.categoryId,
-               c.name AS categoryName
+               c.name AS categoryName,
+               EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.categoryId
         WHERE t.occurredAt >= :from AND t.occurredAt < :until
-          AND t.excluded = 0
+          AND t.excluded = :hidden
           AND (:categoryId IS NULL OR t.categoryId = :categoryId)
           AND (:uncategorisedOnly = 0 OR t.categoryId IS NULL)
         ORDER BY t.occurredAt DESC
@@ -111,5 +120,6 @@ interface BudgetDao {
         until: Long,
         categoryId: String?,
         uncategorisedOnly: Boolean,
+        hidden: Boolean,
     ): Flow<List<TransactionRow>>
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,9 +29,11 @@ class TransactionsViewModel(
 
     private val month = YearMonth.now()
     private val selectedFilter = MutableStateFlow<String?>(null)
+    private val query = MutableStateFlow("")
     private val _message = MutableStateFlow<String?>(null)
 
     val filter: StateFlow<String?> = selectedFilter.asStateFlow()
+    val searchQuery: StateFlow<String> = query.asStateFlow()
     val message: StateFlow<String?> = _message.asStateFlow()
 
     val categories: StateFlow<List<EnvelopeSummary>> =
@@ -43,11 +46,22 @@ class TransactionsViewModel(
             .flatMapLatest { selected ->
                 repository.observeTransactions(
                     month = month,
-                    categoryId = selected.takeUnless { it == INBOX },
+                    categoryId = selected.takeUnless { it == INBOX || it == HIDDEN },
                     uncategorisedOnly = selected == INBOX,
+                    hidden = selected == HIDDEN,
                 )
             }
+            // Narrow the list to places whose name contains what was typed.
+            .combine(query) { rows, text ->
+                val wanted = text.trim()
+                if (wanted.isEmpty()) rows
+                else rows.filter { it.merchant.contains(wanted, ignoreCase = true) }
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun search(text: String) {
+        query.value = text
+    }
 
     fun selectFilter(value: String?) {
         selectedFilter.value = value
@@ -57,6 +71,10 @@ class TransactionsViewModel(
         viewModelScope.launch {
             repository.assignCategory(transaction.id, transaction.merchant, categoryId, rememberPayee)
         }
+    }
+
+    fun restore(id: String) {
+        viewModelScope.launch { repository.restoreTransaction(id) }
     }
 
     fun remove(id: String) {
@@ -86,6 +104,7 @@ class TransactionsViewModel(
 
     companion object {
         const val INBOX = "__inbox__"
+        const val HIDDEN = "__hidden__"
 
         val Factory = viewModelFactory {
             initializer {
