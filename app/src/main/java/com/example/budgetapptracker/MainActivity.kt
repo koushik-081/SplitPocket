@@ -1,8 +1,12 @@
 package com.example.budgetapptracker
 
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,6 +16,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.budgetapptracker.data.ThemeMode
 import com.example.budgetapptracker.security.canUseAppLock
 import com.example.budgetapptracker.security.promptUnlock
 import com.example.budgetapptracker.ui.AppRoot
@@ -27,7 +32,24 @@ class MainActivity : FragmentActivity() {
         val userPrefs = (application as BudgetApp).userPrefs
 
         setContent {
-            BudgetAppTrackerTheme {
+            val themeMode by userPrefs.themeMode.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                ThemeMode.System -> systemDark
+                ThemeMode.Light -> false
+                ThemeMode.Dark -> true
+            }
+
+            // Keeps the status bar icons readable: light icons on dark, dark icons on light.
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                )
+                onDispose {}
+            }
+
+            BudgetAppTrackerTheme(darkTheme = darkTheme) {
                 val name by userPrefs.name.collectAsStateWithLifecycle()
                 val lockEnabled by userPrefs.lockEnabled.collectAsStateWithLifecycle()
                 val lockAvailable = remember { canUseAppLock(this@MainActivity) }

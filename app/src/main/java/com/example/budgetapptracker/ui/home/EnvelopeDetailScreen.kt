@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,9 +32,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.TransactionRow
+import com.example.budgetapptracker.ui.theme.transparentTopBarColors
 import com.example.budgetapptracker.util.toRupeeString
 import java.time.Instant
 import java.time.ZoneId
@@ -62,8 +65,10 @@ fun EnvelopeDetailScreen(
     BackHandler(onBack = onBack)
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = transparentTopBarColors(),
                 title = { Text(envelope.name) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -117,6 +122,7 @@ fun EnvelopeDetailScreen(
 
             items(transactions, key = { it.id }) { transaction ->
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = { Text(transaction.merchant) },
                     supportingContent = { Text(transaction.occurredAt.toDetailDateText()) },
                     trailingContent = {

@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +59,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,10 +82,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.EnvelopeSummary
+import com.example.budgetapptracker.data.ThemeMode
 import com.example.budgetapptracker.security.canUseAppLock
-import com.example.budgetapptracker.ui.theme.EnvelopePalette
-import com.example.budgetapptracker.ui.theme.HeroEnd
-import com.example.budgetapptracker.ui.theme.HeroStart
+import com.example.budgetapptracker.ui.theme.LocalAppColors
 import com.example.budgetapptracker.util.rupeesToPaise
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -99,7 +101,13 @@ private val wholeRupees = NumberFormat.getCurrencyInstance(Locale.forLanguageTag
 // Summary figures are shown without paise to keep the tiles readable.
 private fun Long.toShortRupees(): String = wholeRupees.format(this / 100.0)
 
-private fun accentFor(index: Int): Color = EnvelopePalette[index % EnvelopePalette.size]
+// One accent colour per envelope, in the order the envelopes were created.
+@Composable
+@ReadOnlyComposable
+private fun accentFor(index: Int): Color {
+    val accents = LocalAppColors.current.accents
+    return accents[index % accents.size]
+}
 
 private fun iconFor(name: String): ImageVector {
     val text = name.lowercase()
@@ -128,7 +136,7 @@ private fun greeting(): String = when (LocalTime.now().hour) {
 
 @Composable
 private fun panelColors() =
-    CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    CardDefaults.cardColors(containerColor = LocalAppColors.current.panel)
 
 // What the + button in the bottom bar can ask this screen to do.
 enum class HomeAction(val label: String) {
@@ -148,6 +156,7 @@ fun HomeScreen(
     val lastSevenDays by viewModel.lastSevenDays.collectAsStateWithLifecycle()
     val userName by viewModel.userName.collectAsStateWithLifecycle()
     val lockEnabled by viewModel.lockEnabled.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val openEnvelope by viewModel.openEnvelope.collectAsStateWithLifecycle()
     val openTransactions by viewModel.openEnvelopeTransactions.collectAsStateWithLifecycle()
     var showAddEnvelope by rememberSaveable { mutableStateOf(false) }
@@ -211,6 +220,8 @@ fun HomeScreen(
         SettingsDialog(
             currentName = userName.orEmpty(),
             currentLock = lockEnabled,
+            currentTheme = themeMode,
+            onThemeChange = { viewModel.setThemeMode(it) },
             onDismiss = { showSettings = false },
             onSave = { name, lock ->
                 viewModel.saveProfile(name, lock)
@@ -320,10 +331,13 @@ private fun DashboardScreen(
     val spentPaise = envelopes.sumOf { it.spentPaise }
     var showBreakdown by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold { padding ->
+    Scaffold(containerColor = Color.Transparent) { padding ->
+        // The top inset is applied as padding (not content padding) so cards never scroll under the status bar.
         LazyColumn(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            contentPadding = padding,
+            modifier = Modifier
+                .padding(top = padding.calculateTopPadding())
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = padding.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { Header(userName = userName, onOpenSettings = onOpenSettings) }
@@ -439,6 +453,8 @@ private fun Header(userName: String?, onOpenSettings: () -> Unit) {
 private fun SettingsDialog(
     currentName: String,
     currentLock: Boolean,
+    currentTheme: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, Boolean) -> Unit,
 ) {
@@ -458,6 +474,18 @@ private fun SettingsDialog(
                     label = { Text("Your name") },
                     singleLine = true,
                 )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Appearance", style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ThemeMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = currentTheme == mode,
+                                onClick = { onThemeChange(mode) },
+                                label = { Text(mode.label) },
+                            )
+                        }
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Lock the app", style = MaterialTheme.typography.titleSmall)
@@ -498,7 +526,11 @@ private fun HeroCard(incomePaise: Long, allocatedPaise: Long, spentPaise: Long) 
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
-            .background(Brush.linearGradient(listOf(HeroStart, HeroEnd)))
+            .background(
+                Brush.linearGradient(
+                    listOf(LocalAppColors.current.heroStart, LocalAppColors.current.heroEnd)
+                )
+            )
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -651,7 +683,7 @@ private fun DonutChart(slices: List<Slice>, modifier: Modifier = Modifier) {
 @Composable
 private fun WeekCard(days: List<DaySpend>) {
     val peak = days.maxOf { it.amountPaise }
-    val barColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val accents = LocalAppColors.current.accents
     val peakColor = MaterialTheme.colorScheme.primary
 
     Card(modifier = Modifier.fillMaxWidth(), colors = panelColors()) {
@@ -667,7 +699,7 @@ private fun WeekCard(days: List<DaySpend>) {
                 modifier = Modifier.fillMaxWidth().height(88.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                days.forEach { day ->
+                days.forEachIndexed { index, day ->
                     val fraction = if (peak == 0L) 0f else day.amountPaise.toFloat() / peak
                     val animated by animateFloatAsState(
                         targetValue = fraction.coerceAtLeast(0.06f),
@@ -688,7 +720,8 @@ private fun WeekCard(days: List<DaySpend>) {
                                     .fillMaxHeight(animated)
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(
-                                        if (peak > 0 && day.amountPaise == peak) peakColor else barColor
+                                        if (peak > 0 && day.amountPaise == peak) peakColor
+                                        else accents[(index % 3) + 1].copy(alpha = 0.55f)
                                     ),
                             )
                         }
@@ -732,7 +765,11 @@ private fun EnvelopeTile(
     val fraction = if (envelope.monthlyBudgetPaise == 0L) 0f
     else (envelope.spentPaise.toFloat() / envelope.monthlyBudgetPaise).coerceIn(0f, 1f)
 
-    Card(onClick = onOpen, modifier = modifier, colors = panelColors()) {
+    Card(
+        onClick = onOpen,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.2f)),
+    ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -746,13 +783,13 @@ private fun EnvelopeTile(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(accent.copy(alpha = 0.16f)),
+                        .background(accent),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = iconFor(envelope.name),
                         contentDescription = null,
-                        tint = accent,
+                        tint = LocalAppColors.current.onAccent,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -781,7 +818,7 @@ private fun EnvelopeTile(
 
 @Composable
 private fun ProgressRing(fraction: Float, color: Color, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val track = LocalAppColors.current.track
     val animated by animateFloatAsState(
         targetValue = fraction,
         animationSpec = tween(600),

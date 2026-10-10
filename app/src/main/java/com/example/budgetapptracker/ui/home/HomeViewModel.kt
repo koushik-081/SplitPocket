@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.budgetapptracker.BudgetApp
 import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.data.EnvelopeSummary
+import com.example.budgetapptracker.data.ThemeMode
 import com.example.budgetapptracker.data.TransactionRow
 import com.example.budgetapptracker.data.UserPrefs
 import java.time.Instant
@@ -39,6 +40,7 @@ class HomeViewModel(
 
     val userName: StateFlow<String?> = userPrefs.name
     val lockEnabled: StateFlow<Boolean> = userPrefs.lockEnabled
+    val themeMode: StateFlow<ThemeMode> = userPrefs.themeMode
 
     val envelopes: StateFlow<List<EnvelopeSummary>> =
         repository.observeEnvelopes(month)
@@ -84,6 +86,10 @@ class HomeViewModel(
 
     fun saveProfile(name: String, lockEnabled: Boolean) {
         userPrefs.save(name, lockEnabled)
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        userPrefs.setThemeMode(mode)
     }
 
     fun openEnvelope(id: String) {

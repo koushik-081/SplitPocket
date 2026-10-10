@@ -65,7 +65,7 @@ fun WelcomeScreen(lockAvailable: Boolean, onDone: (name: String, lockEnabled: Bo
     var name by rememberSaveable { mutableStateOf("") }
     var lockEnabled by rememberSaveable { mutableStateOf(lockAvailable) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -154,7 +154,7 @@ fun LockScreen(onUnlock: () -> Unit) {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
         Column(
             modifier = Modifier.fillMaxSize().systemBarsPadding().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),

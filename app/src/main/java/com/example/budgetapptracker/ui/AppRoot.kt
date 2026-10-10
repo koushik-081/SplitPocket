@@ -35,10 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.example.budgetapptracker.ui.home.HomeAction
+import com.example.budgetapptracker.ui.theme.LocalAppColors
 import com.example.budgetapptracker.ui.home.HomeScreen
 import com.example.budgetapptracker.ui.transactions.TransactionsScreen
 
@@ -53,6 +55,7 @@ fun AppRoot() {
     var pendingAction by remember { mutableStateOf<HomeAction?>(null) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             BottomBar(
@@ -87,7 +90,7 @@ private fun BottomBar(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(color = LocalAppColors.current.navBar) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
