@@ -44,54 +44,68 @@ import com.example.budgetapptracker.util.toRupeeString
 fun HomeScreen(viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
     val envelopes by viewModel.envelopes.collectAsStateWithLifecycle()
     val incomePaise by viewModel.incomePaise.collectAsStateWithLifecycle()
+    val openEnvelope by viewModel.openEnvelope.collectAsStateWithLifecycle()
+    val openTransactions by viewModel.openEnvelopeTransactions.collectAsStateWithLifecycle()
     var showAddEnvelope by rememberSaveable { mutableStateOf(false) }
     var showAddIncome by rememberSaveable { mutableStateOf(false) }
     var expenseTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
     var budgetTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("This month") },
-                actions = {
-                    TextButton(onClick = { showAddIncome = true }) { Text("Add income") }
-                },
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { showAddEnvelope = true }) {
-                Text("New envelope")
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                SummaryCard(
-                    incomePaise = incomePaise,
-                    allocatedPaise = envelopes.sumOf { it.monthlyBudgetPaise },
-                    spentPaise = envelopes.sumOf { it.spentPaise },
+    val current = openEnvelope
+    if (current != null) {
+        EnvelopeDetailScreen(
+            envelope = current,
+            transactions = openTransactions,
+            onBack = { viewModel.closeEnvelope() },
+            onAddExpense = { expenseTarget = current },
+            onEditBudget = { budgetTarget = current },
+            onRemove = { viewModel.removeTransaction(it) },
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("This month") },
+                    actions = {
+                        TextButton(onClick = { showAddIncome = true }) { Text("Add income") }
+                    },
                 )
-            }
-            if (envelopes.isEmpty()) {
+            },
+            floatingActionButton = {
+                ExtendedFloatingActionButton(onClick = { showAddEnvelope = true }) {
+                    Text("New envelope")
+                }
+            },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                contentPadding = padding,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 item {
-                    Text(
-                        text = "Create your first envelope to start budgeting",
-                        modifier = Modifier.padding(vertical = 24.dp),
+                    SummaryCard(
+                        incomePaise = incomePaise,
+                        allocatedPaise = envelopes.sumOf { it.monthlyBudgetPaise },
+                        spentPaise = envelopes.sumOf { it.spentPaise },
                     )
                 }
+                if (envelopes.isEmpty()) {
+                    item {
+                        Text(
+                            text = "Create your first envelope to start budgeting",
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                }
+                items(envelopes, key = { it.id }) { envelope ->
+                    EnvelopeCard(
+                        envelope = envelope,
+                        onOpen = { viewModel.openEnvelope(envelope.id) },
+                        onEditBudget = { budgetTarget = envelope },
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(72.dp)) }
             }
-            items(envelopes, key = { it.id }) { envelope ->
-                EnvelopeCard(
-                    envelope = envelope,
-                    onSpend = { expenseTarget = envelope },
-                    onEditBudget = { budgetTarget = envelope },
-                )
-            }
-            item { Spacer(modifier = Modifier.height(72.dp)) }
         }
     }
 
@@ -183,14 +197,14 @@ private fun SummaryRow(label: String, value: String, valueColor: Color = Color.U
 @Composable
 private fun EnvelopeCard(
     envelope: EnvelopeSummary,
-    onSpend: () -> Unit,
+    onOpen: () -> Unit,
     onEditBudget: () -> Unit,
 ) {
     val overspent = envelope.remainingPaise < 0
     val fraction = if (envelope.monthlyBudgetPaise == 0L) 0f
     else (envelope.spentPaise.toFloat() / envelope.monthlyBudgetPaise).coerceIn(0f, 1f)
 
-    Card(onClick = onSpend, modifier = Modifier.fillMaxWidth()) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
