@@ -93,7 +93,7 @@ fun TransactionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transactions") },
+                title = { Text("Activity") },
                 actions = {
                     TextButton(onClick = {
                         val granted = ContextCompat.checkSelfPermission(

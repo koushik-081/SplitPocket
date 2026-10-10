@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +24,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.DirectionsBus
 import androidx.compose.material.icons.rounded.Favorite
@@ -44,9 +46,6 @@ import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -126,8 +125,19 @@ private fun greeting(): String = when (LocalTime.now().hour) {
 private fun panelColors() =
     CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
 
+// What the + button in the bottom bar can ask this screen to do.
+enum class HomeAction(val label: String) {
+    AddExpense("Add expense"),
+    AddIncome("Add income"),
+    NewEnvelope("New envelope"),
+}
+
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)) {
+fun HomeScreen(
+    action: HomeAction? = null,
+    onActionHandled: () -> Unit = {},
+    viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+) {
     val envelopes by viewModel.envelopes.collectAsStateWithLifecycle()
     val incomePaise by viewModel.incomePaise.collectAsStateWithLifecycle()
     val lastSevenDays by viewModel.lastSevenDays.collectAsStateWithLifecycle()
@@ -135,8 +145,19 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Fact
     val openTransactions by viewModel.openEnvelopeTransactions.collectAsStateWithLifecycle()
     var showAddEnvelope by rememberSaveable { mutableStateOf(false) }
     var showAddIncome by rememberSaveable { mutableStateOf(false) }
+    var showPickEnvelope by rememberSaveable { mutableStateOf(false) }
     var expenseTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
     var budgetTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
+
+    LaunchedEffect(action) {
+        when (action) {
+            HomeAction.AddExpense -> showPickEnvelope = true
+            HomeAction.AddIncome -> showAddIncome = true
+            HomeAction.NewEnvelope -> showAddEnvelope = true
+            null -> return@LaunchedEffect
+        }
+        onActionHandled()
+    }
 
     // Keeps the last opened envelope on screen while the detail view slides away.
     val current = openEnvelope
@@ -171,11 +192,48 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Fact
                 envelopes = envelopes,
                 incomePaise = incomePaise,
                 lastSevenDays = lastSevenDays,
-                onAddIncome = { showAddIncome = true },
-                onNewEnvelope = { showAddEnvelope = true },
                 onOpen = { viewModel.openEnvelope(it.id) },
             )
         }
+    }
+
+    if (showPickEnvelope) {
+        AlertDialog(
+            onDismissRequest = { showPickEnvelope = false },
+            title = { Text("Add expense to") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (envelopes.isEmpty()) {
+                        Text("Create an envelope first.")
+                    }
+                    envelopes.forEachIndexed { index, envelope ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable {
+                                    showPickEnvelope = false
+                                    expenseTarget = envelope
+                                }
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                imageVector = iconFor(envelope.name),
+                                contentDescription = null,
+                                tint = accentFor(index),
+                            )
+                            Text(envelope.name, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPickEnvelope = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (showAddEnvelope) {
@@ -232,8 +290,6 @@ private fun DashboardScreen(
     envelopes: List<EnvelopeSummary>,
     incomePaise: Long,
     lastSevenDays: List<DaySpend>,
-    onAddIncome: () -> Unit,
-    onNewEnvelope: () -> Unit,
     onOpen: (EnvelopeSummary) -> Unit,
 ) {
     val allocatedPaise = envelopes.sumOf { it.monthlyBudgetPaise }
@@ -246,9 +302,7 @@ private fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Header(onAddIncome = onAddIncome, onNewEnvelope = onNewEnvelope)
-            }
+            item { Header() }
             item {
                 HeroCard(
                     incomePaise = incomePaise,
@@ -278,7 +332,7 @@ private fun DashboardScreen(
             if (envelopes.isEmpty()) {
                 item {
                     Text(
-                        text = "Tap + to create your first envelope",
+                        text = "Tap + below to create your first envelope",
                         modifier = Modifier.padding(start = 4.dp, bottom = 24.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -329,43 +383,14 @@ private fun DashboardScreen(
 }
 
 @Composable
-private fun Header(onAddIncome: () -> Unit, onNewEnvelope: () -> Unit) {
-    var menuOpen by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column {
-            Text(
-                text = YearMonth.now().format(monthTitleFormat),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(text = greeting(), style = MaterialTheme.typography.headlineSmall)
-        }
-        Box {
-            FilledTonalIconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Rounded.Add, contentDescription = "Add")
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("New envelope") },
-                    onClick = {
-                        menuOpen = false
-                        onNewEnvelope()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Add income") },
-                    onClick = {
-                        menuOpen = false
-                        onAddIncome()
-                    },
-                )
-            }
-        }
+private fun Header() {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp)) {
+        Text(
+            text = YearMonth.now().format(monthTitleFormat),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = greeting(), style = MaterialTheme.typography.headlineSmall)
     }
 }
 
