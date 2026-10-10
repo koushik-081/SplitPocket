@@ -14,6 +14,15 @@ data class EnvelopeSummary(
     val remainingPaise: Long get() = monthlyBudgetPaise - spentPaise
 }
 
+data class TransactionRow(
+    val id: String,
+    val amountPaise: Long,
+    val merchant: String,
+    val occurredAt: Long,
+    val categoryId: String?,
+    val categoryName: String?,
+)
+
 @Dao
 interface BudgetDao {
     @Insert
@@ -21,6 +30,9 @@ interface BudgetDao {
 
     @Insert
     suspend fun insertTransaction(transaction: TransactionEntity)
+
+    @Query("DELETE FROM transactions WHERE id = :id")
+    suspend fun deleteTransaction(id: String)
 
     @Query(
         """
@@ -35,4 +47,17 @@ interface BudgetDao {
         """
     )
     fun observeEnvelopes(from: Long, until: Long): Flow<List<EnvelopeSummary>>
+
+    @Query(
+        """
+        SELECT t.id, t.amountPaise, t.merchant, t.occurredAt, t.categoryId,
+               c.name AS categoryName
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.categoryId
+        WHERE t.occurredAt >= :from AND t.occurredAt < :until
+          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
+        ORDER BY t.occurredAt DESC
+        """
+    )
+    fun observeTransactions(from: Long, until: Long, categoryId: String?): Flow<List<TransactionRow>>
 }
