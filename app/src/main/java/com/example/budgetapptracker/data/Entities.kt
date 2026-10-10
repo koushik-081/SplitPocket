@@ -1,5 +1,6 @@
 package com.example.budgetapptracker.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -39,6 +40,7 @@ data class TransactionEntity(
     val occurredAt: Long = System.currentTimeMillis(),
     val source: String = "MANUAL",
     val smsKey: String? = null,
+    @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
 )
 
 @Entity(tableName = "incomes")

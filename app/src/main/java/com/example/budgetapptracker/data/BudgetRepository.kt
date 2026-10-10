@@ -11,9 +11,13 @@ class BudgetRepository(private val dao: BudgetDao) {
         return dao.observeEnvelopes(from, until)
     }
 
-    fun observeTransactions(month: YearMonth, categoryId: String?): Flow<List<TransactionRow>> {
+    fun observeTransactions(
+        month: YearMonth,
+        categoryId: String?,
+        uncategorisedOnly: Boolean,
+    ): Flow<List<TransactionRow>> {
         val (from, until) = month.toEpochRange()
-        return dao.observeTransactions(from, until, categoryId)
+        return dao.observeTransactions(from, until, categoryId, uncategorisedOnly)
     }
 
     fun observeIncomeTotal(month: YearMonth): Flow<Long> {
@@ -52,7 +56,7 @@ class BudgetRepository(private val dao: BudgetDao) {
         val rowId = dao.insertTransactionIfNew(
             TransactionEntity(
                 amountPaise = amountPaise,
-                categoryId = null,
+                categoryId = dao.findRuleCategory(merchant.uppercase()),
                 merchant = merchant,
                 occurredAt = occurredAt,
                 source = "SMS",
@@ -62,8 +66,23 @@ class BudgetRepository(private val dao: BudgetDao) {
         return rowId != -1L
     }
 
-    suspend fun deleteTransaction(id: String) {
-        dao.deleteTransaction(id)
+    suspend fun assignCategory(
+        transactionId: String,
+        merchant: String,
+        categoryId: String,
+        rememberPayee: Boolean,
+    ) {
+        dao.setTransactionCategory(transactionId, categoryId)
+        if (rememberPayee) {
+            val key = merchant.uppercase()
+            dao.upsertRule(MerchantRuleEntity(merchant = key, categoryId = categoryId))
+            dao.categoriseUncategorised(key, categoryId)
+        }
+    }
+
+    suspend fun removeTransaction(id: String) {
+        dao.excludeSmsTransaction(id)
+        dao.deleteManualTransaction(id)
     }
 
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {

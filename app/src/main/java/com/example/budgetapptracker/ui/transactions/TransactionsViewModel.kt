@@ -27,10 +27,10 @@ class TransactionsViewModel(
 ) : ViewModel() {
 
     private val month = YearMonth.now()
-    private val selectedCategoryId = MutableStateFlow<String?>(null)
+    private val selectedFilter = MutableStateFlow<String?>(null)
     private val _message = MutableStateFlow<String?>(null)
 
-    val filter: StateFlow<String?> = selectedCategoryId.asStateFlow()
+    val filter: StateFlow<String?> = selectedFilter.asStateFlow()
     val message: StateFlow<String?> = _message.asStateFlow()
 
     val categories: StateFlow<List<EnvelopeSummary>> =
@@ -39,16 +39,28 @@ class TransactionsViewModel(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val transactions: StateFlow<List<TransactionRow>> =
-        selectedCategoryId
-            .flatMapLatest { repository.observeTransactions(month, it) }
+        selectedFilter
+            .flatMapLatest { selected ->
+                repository.observeTransactions(
+                    month = month,
+                    categoryId = selected.takeUnless { it == INBOX },
+                    uncategorisedOnly = selected == INBOX,
+                )
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun selectCategory(id: String?) {
-        selectedCategoryId.value = id
+    fun selectFilter(value: String?) {
+        selectedFilter.value = value
     }
 
-    fun delete(id: String) {
-        viewModelScope.launch { repository.deleteTransaction(id) }
+    fun assign(transaction: TransactionRow, categoryId: String, rememberPayee: Boolean) {
+        viewModelScope.launch {
+            repository.assignCategory(transaction.id, transaction.merchant, categoryId, rememberPayee)
+        }
+    }
+
+    fun remove(id: String) {
+        viewModelScope.launch { repository.removeTransaction(id) }
     }
 
     fun scanSms() {
@@ -73,6 +85,8 @@ class TransactionsViewModel(
     }
 
     companion object {
+        const val INBOX = "__inbox__"
+
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as BudgetApp

@@ -9,7 +9,11 @@ import com.example.budgetapptracker.sms.SmsImporter
 class BudgetApp : Application() {
     val database by lazy {
         Room.databaseBuilder(this, AppDatabase::class.java, "budget.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+            )
             .build()
     }
     val repository by lazy { BudgetRepository(database.budgetDao()) }
