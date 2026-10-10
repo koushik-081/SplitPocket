@@ -63,6 +63,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private const val UNKNOWN_MERCHANT = "UNKNOWN"
+// Reading old messages and being told about new ones are two separate permissions.
+private val smsPermissions = arrayOf(
+    Manifest.permission.READ_SMS,
+    Manifest.permission.RECEIVE_SMS,
+)
 
 private val dateFormat = DateTimeFormatter.ofPattern("d MMM, h:mm a")
 
@@ -88,9 +93,9 @@ fun TransactionsScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) viewModel.scanSms()
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results[Manifest.permission.READ_SMS] == true) viewModel.scanSms()
         else viewModel.showMessage("SMS permission is needed to scan for expenses")
     }
 
@@ -109,12 +114,12 @@ fun TransactionsScreen(
                 title = { Text("Activity") },
                 actions = {
                     TextButton(onClick = {
-                        val granted = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.READ_SMS,
-                        ) == PackageManager.PERMISSION_GRANTED
+                        val granted = smsPermissions.all {
+                            ContextCompat.checkSelfPermission(context, it) ==
+                                    PackageManager.PERMISSION_GRANTED
+                        }
                         if (granted) viewModel.scanSms()
-                        else permissionLauncher.launch(Manifest.permission.READ_SMS)
+                        else permissionLauncher.launch(smsPermissions)
                     }) { Text("Scan SMS") }
                 },
             )

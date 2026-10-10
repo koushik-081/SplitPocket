@@ -87,7 +87,7 @@ class TransactionsViewModel(
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
-            val added = smsImporter.importSince(monthStart)
+            val added = smsImporter.importSince(monthStart).size
             _message.value =
                 if (added == 0) "No new bank SMS found this month"
                 else "$added new expenses imported"

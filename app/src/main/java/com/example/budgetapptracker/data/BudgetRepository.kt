@@ -51,23 +51,22 @@ class BudgetRepository(private val dao: BudgetDao) {
         )
     }
 
+    // Returns the saved expense, or null if this SMS was already imported.
     suspend fun addSmsExpense(
         amountPaise: Long,
         merchant: String,
         occurredAt: Long,
         smsKey: String,
-    ): Boolean {
-        val rowId = dao.insertTransactionIfNew(
-            TransactionEntity(
-                amountPaise = amountPaise,
-                categoryId = dao.findRuleCategory(merchant.uppercase()),
-                merchant = merchant,
-                occurredAt = occurredAt,
-                source = "SMS",
-                smsKey = smsKey,
-            )
+    ): TransactionEntity? {
+        val expense = TransactionEntity(
+            amountPaise = amountPaise,
+            categoryId = dao.findRuleCategory(merchant.uppercase()),
+            merchant = merchant,
+            occurredAt = occurredAt,
+            source = "SMS",
+            smsKey = smsKey,
         )
-        return rowId != -1L
+        return expense.takeIf { dao.insertTransactionIfNew(it) != -1L }
     }
 
     suspend fun assignCategory(

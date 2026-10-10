@@ -3,6 +3,7 @@ package com.example.budgetapptracker.sms
 import android.content.Context
 import android.provider.Telephony
 import com.example.budgetapptracker.data.BudgetRepository
+import com.example.budgetapptracker.data.TransactionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -10,8 +11,9 @@ class SmsImporter(
     private val context: Context,
     private val repository: BudgetRepository,
 ) {
-    suspend fun importSince(sinceMillis: Long): Int = withContext(Dispatchers.IO) {
-        var added = 0
+    // Returns the expenses that were newly saved; messages imported before are skipped.
+    suspend fun importSince(sinceMillis: Long): List<TransactionEntity> = withContext(Dispatchers.IO) {
+        val added = mutableListOf<TransactionEntity>()
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE),
@@ -24,14 +26,12 @@ class SmsImporter(
                 val body = cursor.getString(1) ?: continue
                 val date = cursor.getLong(2)
 
-                // Banks send from named senders (e.g. VM-HDFCBK); skip personal numbers.
-                if (address.none { it.isLetter() }) continue
+                if (!isBankSender(address)) continue
 
                 val parsed = SmsParser.parse(body) ?: continue
                 val smsKey = "$address|$date|${body.hashCode()}"
-                if (repository.addSmsExpense(parsed.amountPaise, parsed.merchant, date, smsKey)) {
-                    added++
-                }
+                repository.addSmsExpense(parsed.amountPaise, parsed.merchant, date, smsKey)
+                    ?.let { added += it }
             }
         }
         added
