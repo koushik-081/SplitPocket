@@ -35,3 +35,11 @@ data class TransactionEntity(
     val occurredAt: Long = System.currentTimeMillis(),
     val source: String = "MANUAL",
 )
+
+@Entity(tableName = "incomes")
+data class IncomeEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val amountPaise: Long,
+    val source: String,
+    val receivedAt: Long = System.currentTimeMillis(),
+)

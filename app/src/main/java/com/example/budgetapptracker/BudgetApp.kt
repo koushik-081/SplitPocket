@@ -7,7 +7,9 @@ import com.example.budgetapptracker.data.BudgetRepository
 
 class BudgetApp : Application() {
     val database by lazy {
-        Room.databaseBuilder(this, AppDatabase::class.java, "budget.db").build()
+        Room.databaseBuilder(this, AppDatabase::class.java, "budget.db")
+            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
     }
     val repository by lazy { BudgetRepository(database.budgetDao()) }
 }

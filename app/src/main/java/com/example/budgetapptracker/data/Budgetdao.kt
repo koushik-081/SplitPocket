@@ -31,8 +31,22 @@ interface BudgetDao {
     @Insert
     suspend fun insertTransaction(transaction: TransactionEntity)
 
+    @Insert
+    suspend fun insertIncome(income: IncomeEntity)
+
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteTransaction(id: String)
+
+    @Query("UPDATE categories SET monthlyBudgetPaise = :budgetPaise WHERE id = :id")
+    suspend fun updateCategoryBudget(id: String, budgetPaise: Long)
+
+    @Query(
+        """
+        SELECT COALESCE(SUM(amountPaise), 0) FROM incomes
+        WHERE receivedAt >= :from AND receivedAt < :until
+        """
+    )
+    fun observeIncomeTotal(from: Long, until: Long): Flow<Long>
 
     @Query(
         """

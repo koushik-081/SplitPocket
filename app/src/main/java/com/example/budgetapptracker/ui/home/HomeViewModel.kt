@@ -16,12 +16,26 @@ import kotlinx.coroutines.launch
 
 class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
 
+    private val month = YearMonth.now()
+
     val envelopes: StateFlow<List<EnvelopeSummary>> =
-        repository.observeEnvelopes(YearMonth.now())
+        repository.observeEnvelopes(month)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val incomePaise: StateFlow<Long> =
+        repository.observeIncomeTotal(month)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
     fun addCategory(name: String, budgetPaise: Long) {
         viewModelScope.launch { repository.addCategory(name, budgetPaise) }
+    }
+
+    fun updateBudget(categoryId: String, budgetPaise: Long) {
+        viewModelScope.launch { repository.updateBudget(categoryId, budgetPaise) }
+    }
+
+    fun addIncome(source: String, amountPaise: Long) {
+        viewModelScope.launch { repository.addIncome(source, amountPaise) }
     }
 
     fun addExpense(categoryId: String, amountPaise: Long, merchant: String) {

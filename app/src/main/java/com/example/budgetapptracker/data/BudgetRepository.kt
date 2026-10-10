@@ -16,8 +16,21 @@ class BudgetRepository(private val dao: BudgetDao) {
         return dao.observeTransactions(from, until, categoryId)
     }
 
+    fun observeIncomeTotal(month: YearMonth): Flow<Long> {
+        val (from, until) = month.toEpochRange()
+        return dao.observeIncomeTotal(from, until)
+    }
+
     suspend fun addCategory(name: String, budgetPaise: Long) {
         dao.insertCategory(CategoryEntity(name = name.trim(), monthlyBudgetPaise = budgetPaise))
+    }
+
+    suspend fun updateBudget(categoryId: String, budgetPaise: Long) {
+        dao.updateCategoryBudget(categoryId, budgetPaise)
+    }
+
+    suspend fun addIncome(source: String, amountPaise: Long) {
+        dao.insertIncome(IncomeEntity(amountPaise = amountPaise, source = source.trim()))
     }
 
     suspend fun addExpense(categoryId: String, amountPaise: Long, merchant: String) {
