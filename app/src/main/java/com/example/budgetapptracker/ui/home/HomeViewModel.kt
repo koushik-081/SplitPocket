@@ -9,6 +9,7 @@ import com.example.budgetapptracker.BudgetApp
 import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.TransactionRow
+import com.example.budgetapptracker.data.UserPrefs
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -28,10 +29,16 @@ import kotlinx.coroutines.launch
 
 data class DaySpend(val label: String, val amountPaise: Long)
 
-class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
+class HomeViewModel(
+    private val repository: BudgetRepository,
+    private val userPrefs: UserPrefs,
+) : ViewModel() {
 
     private val month = YearMonth.now()
     private val openEnvelopeId = MutableStateFlow<String?>(null)
+
+    val userName: StateFlow<String?> = userPrefs.name
+    val lockEnabled: StateFlow<Boolean> = userPrefs.lockEnabled
 
     val envelopes: StateFlow<List<EnvelopeSummary>> =
         repository.observeEnvelopes(month)
@@ -75,6 +82,10 @@ class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    fun saveProfile(name: String, lockEnabled: Boolean) {
+        userPrefs.save(name, lockEnabled)
+    }
+
     fun openEnvelope(id: String) {
         openEnvelopeId.value = id
     }
@@ -107,7 +118,7 @@ class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as BudgetApp
-                HomeViewModel(app.repository)
+                HomeViewModel(app.repository, app.userPrefs)
             }
         }
     }

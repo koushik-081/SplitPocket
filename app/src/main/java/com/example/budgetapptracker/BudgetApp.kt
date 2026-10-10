@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.example.budgetapptracker.data.AppDatabase
 import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.sms.SmsImporter
+import com.example.budgetapptracker.data.UserPrefs
 
 class BudgetApp : Application() {
     val database by lazy {
@@ -18,4 +19,5 @@ class BudgetApp : Application() {
     }
     val repository by lazy { BudgetRepository(database.budgetDao()) }
     val smsImporter by lazy { SmsImporter(this, repository) }
+    val userPrefs by lazy { UserPrefs(this) }
 }

@@ -41,15 +41,18 @@ import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,12 +72,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.EnvelopeSummary
+import com.example.budgetapptracker.security.canUseAppLock
 import com.example.budgetapptracker.ui.theme.EnvelopePalette
 import com.example.budgetapptracker.ui.theme.HeroEnd
 import com.example.budgetapptracker.ui.theme.HeroStart
@@ -141,11 +146,14 @@ fun HomeScreen(
     val envelopes by viewModel.envelopes.collectAsStateWithLifecycle()
     val incomePaise by viewModel.incomePaise.collectAsStateWithLifecycle()
     val lastSevenDays by viewModel.lastSevenDays.collectAsStateWithLifecycle()
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val lockEnabled by viewModel.lockEnabled.collectAsStateWithLifecycle()
     val openEnvelope by viewModel.openEnvelope.collectAsStateWithLifecycle()
     val openTransactions by viewModel.openEnvelopeTransactions.collectAsStateWithLifecycle()
     var showAddEnvelope by rememberSaveable { mutableStateOf(false) }
     var showAddIncome by rememberSaveable { mutableStateOf(false) }
     var showPickEnvelope by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     var expenseTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
     var budgetTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
 
@@ -192,9 +200,23 @@ fun HomeScreen(
                 envelopes = envelopes,
                 incomePaise = incomePaise,
                 lastSevenDays = lastSevenDays,
+                userName = userName,
+                onOpenSettings = { showSettings = true },
                 onOpen = { viewModel.openEnvelope(it.id) },
             )
         }
+    }
+
+    if (showSettings) {
+        SettingsDialog(
+            currentName = userName.orEmpty(),
+            currentLock = lockEnabled,
+            onDismiss = { showSettings = false },
+            onSave = { name, lock ->
+                viewModel.saveProfile(name, lock)
+                showSettings = false
+            },
+        )
     }
 
     if (showPickEnvelope) {
@@ -290,6 +312,8 @@ private fun DashboardScreen(
     envelopes: List<EnvelopeSummary>,
     incomePaise: Long,
     lastSevenDays: List<DaySpend>,
+    userName: String?,
+    onOpenSettings: () -> Unit,
     onOpen: (EnvelopeSummary) -> Unit,
 ) {
     val allocatedPaise = envelopes.sumOf { it.monthlyBudgetPaise }
@@ -302,7 +326,7 @@ private fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { Header() }
+            item { Header(userName = userName, onOpenSettings = onOpenSettings) }
             item {
                 HeroCard(
                     incomePaise = incomePaise,
@@ -383,15 +407,83 @@ private fun DashboardScreen(
 }
 
 @Composable
-private fun Header() {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp)) {
-        Text(
-            text = YearMonth.now().format(monthTitleFormat),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(text = greeting(), style = MaterialTheme.typography.headlineSmall)
+private fun Header(userName: String?, onOpenSettings: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = YearMonth.now().format(monthTitleFormat),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (userName.isNullOrBlank()) greeting() else "${greeting()}, $userName",
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onOpenSettings) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = "Settings",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
+}
+
+@Composable
+private fun SettingsDialog(
+    currentName: String,
+    currentLock: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val lockAvailable = remember { canUseAppLock(context) }
+    var name by rememberSaveable { mutableStateOf(currentName) }
+    var lockEnabled by rememberSaveable { mutableStateOf(currentLock) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(24) },
+                    label = { Text("Your name") },
+                    singleLine = true,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Lock the app", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = if (lockAvailable) "Ask for fingerprint, face or screen lock when opening"
+                            else "Set a screen lock on this phone to use this",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = lockEnabled && lockAvailable,
+                        onCheckedChange = { lockEnabled = it },
+                        enabled = lockAvailable,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = { onSave(name, lockEnabled && lockAvailable) },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
