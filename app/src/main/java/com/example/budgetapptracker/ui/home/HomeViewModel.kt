@@ -9,7 +9,12 @@ import com.example.budgetapptracker.BudgetApp
 import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.TransactionRow
+import java.time.Instant
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,8 +22,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class DaySpend(val label: String, val amountPaise: Long)
 
 class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
 
@@ -32,6 +40,27 @@ class HomeViewModel(private val repository: BudgetRepository) : ViewModel() {
     val incomePaise: StateFlow<Long> =
         repository.observeIncomeTotal(month)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
+    val lastSevenDays: StateFlow<List<DaySpend>> = run {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
+        val from = days.first().atStartOfDay(zone).toInstant().toEpochMilli()
+
+        repository.observeSince(from)
+            .map { rows ->
+                val byDay = rows.groupBy {
+                    Instant.ofEpochMilli(it.occurredAt).atZone(zone).toLocalDate()
+                }
+                days.map { day ->
+                    DaySpend(
+                        label = day.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                        amountPaise = byDay[day].orEmpty().sumOf { it.amountPaise },
+                    )
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }
 
     val openEnvelope: StateFlow<EnvelopeSummary?> =
         combine(envelopes, openEnvelopeId) { list, id -> list.firstOrNull { it.id == id } }

@@ -1,5 +1,7 @@
 package com.example.budgetapptracker.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -47,9 +49,11 @@ fun AppRoot() {
         },
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
-            when (tab) {
-                Tab.Envelopes -> HomeScreen()
-                Tab.Transactions -> TransactionsScreen()
+            Crossfade(targetState = tab, animationSpec = tween(200), label = "tab") { current ->
+                when (current) {
+                    Tab.Envelopes -> HomeScreen()
+                    Tab.Transactions -> TransactionsScreen()
+                }
             }
         }
     }

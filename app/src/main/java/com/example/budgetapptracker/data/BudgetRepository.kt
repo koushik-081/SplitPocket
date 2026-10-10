@@ -25,6 +25,9 @@ class BudgetRepository(private val dao: BudgetDao) {
         return dao.observeIncomeTotal(from, until)
     }
 
+    fun observeSince(from: Long): Flow<List<TransactionRow>> =
+        dao.observeTransactions(from, Long.MAX_VALUE, null, false)
+
     suspend fun addCategory(name: String, budgetPaise: Long) {
         dao.insertCategory(CategoryEntity(name = name.trim(), monthlyBudgetPaise = budgetPaise))
     }
