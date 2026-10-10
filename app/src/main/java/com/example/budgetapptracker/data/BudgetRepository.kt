@@ -43,6 +43,25 @@ class BudgetRepository(private val dao: BudgetDao) {
         )
     }
 
+    suspend fun addSmsExpense(
+        amountPaise: Long,
+        merchant: String,
+        occurredAt: Long,
+        smsKey: String,
+    ): Boolean {
+        val rowId = dao.insertTransactionIfNew(
+            TransactionEntity(
+                amountPaise = amountPaise,
+                categoryId = null,
+                merchant = merchant,
+                occurredAt = occurredAt,
+                source = "SMS",
+                smsKey = smsKey,
+            )
+        )
+        return rowId != -1L
+    }
+
     suspend fun deleteTransaction(id: String) {
         dao.deleteTransaction(id)
     }

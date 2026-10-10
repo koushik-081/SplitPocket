@@ -2,6 +2,7 @@ package com.example.budgetapptracker.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -30,6 +31,9 @@ interface BudgetDao {
 
     @Insert
     suspend fun insertTransaction(transaction: TransactionEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTransactionIfNew(transaction: TransactionEntity): Long
 
     @Insert
     suspend fun insertIncome(income: IncomeEntity)

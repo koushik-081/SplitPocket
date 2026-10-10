@@ -24,7 +24,11 @@ data class CategoryEntity(
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index("categoryId"), Index("occurredAt")],
+    indices = [
+        Index("categoryId"),
+        Index("occurredAt"),
+        Index(value = ["smsKey"], unique = true),
+    ],
 )
 data class TransactionEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
@@ -34,6 +38,7 @@ data class TransactionEntity(
     val note: String = "",
     val occurredAt: Long = System.currentTimeMillis(),
     val source: String = "MANUAL",
+    val smsKey: String? = null,
 )
 
 @Entity(tableName = "incomes")
@@ -42,4 +47,10 @@ data class IncomeEntity(
     val amountPaise: Long,
     val source: String,
     val receivedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "merchant_rules")
+data class MerchantRuleEntity(
+    @PrimaryKey val merchant: String,
+    val categoryId: String,
 )

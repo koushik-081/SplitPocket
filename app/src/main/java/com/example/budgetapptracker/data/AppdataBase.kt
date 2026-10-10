@@ -6,8 +6,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [CategoryEntity::class, TransactionEntity::class, IncomeEntity::class],
-    version = 2,
+    entities = [
+        CategoryEntity::class,
+        TransactionEntity::class,
+        IncomeEntity::class,
+        MerchantRuleEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +28,22 @@ abstract class AppDatabase : RoomDatabase() {
                             "`source` TEXT NOT NULL, " +
                             "`receivedAt` INTEGER NOT NULL, " +
                             "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `smsKey` TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_smsKey` " +
+                            "ON `transactions` (`smsKey`)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `merchant_rules` (" +
+                            "`merchant` TEXT NOT NULL, " +
+                            "`categoryId` TEXT NOT NULL, " +
+                            "PRIMARY KEY(`merchant`))"
                 )
             }
         }

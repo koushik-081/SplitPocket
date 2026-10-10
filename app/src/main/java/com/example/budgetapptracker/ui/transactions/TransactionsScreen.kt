@@ -1,5 +1,9 @@
 package com.example.budgetapptracker.ui.transactions
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,17 +21,22 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.TransactionRow
@@ -49,9 +58,43 @@ fun TransactionsScreen(
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val selected by viewModel.filter.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<TransactionRow?>(null) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Transactions") }) }) { padding ->
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.scanSms()
+        else viewModel.showMessage("SMS permission is needed to scan for expenses")
+    }
+
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Transactions") },
+                actions = {
+                    TextButton(onClick = {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.READ_SMS,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) viewModel.scanSms()
+                        else permissionLauncher.launch(Manifest.permission.READ_SMS)
+                    }) { Text("Scan SMS") }
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
