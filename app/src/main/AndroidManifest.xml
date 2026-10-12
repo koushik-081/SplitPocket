@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
+    <!-- The QR scanner library asks for internet access for its own usage reports.
+         This app works offline, so those two requests are removed. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
     <!-- Lets the app ask Android which UPI payment apps are installed. -->
     <queries>
         <intent>
@@ -34,11 +39,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- The QR scanner screen, kept upright instead of sideways. -->
-        <activity
-            android:name="com.journeyapps.barcodescanner.CaptureActivity"
-            android:screenOrientation="portrait"
-            tools:replace="android:screenOrientation" />
+        <!-- Asks Google Play services to have its QR scanner ready. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <receiver
             android:name=".sms.SmsReceiver"

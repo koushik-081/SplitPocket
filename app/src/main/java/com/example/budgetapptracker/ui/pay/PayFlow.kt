@@ -1,7 +1,6 @@
 package com.example.budgetapptracker.ui.pay
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -53,9 +52,13 @@ import com.example.budgetapptracker.ui.home.HomeViewModel
 import com.example.budgetapptracker.ui.home.PendingPayment
 import com.example.budgetapptracker.util.rupeesToPaise
 import com.example.budgetapptracker.util.toRupeeString
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import java.math.BigDecimal
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.rememberModalBottomSheetState
+import android.content.Context
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 
 enum class PayStart { ScanQr, EnterUpiId }
 
@@ -74,21 +77,16 @@ fun PayFlow(
     var request by remember { mutableStateOf<UpiRequest?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
 
-    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val text = result.contents ?: return@rememberLauncherForActivityResult
-        val scanned = UpiLink.parse(text)
-        if (scanned != null) request = scanned
-        else problem = "That QR code is not a UPI payment code."
-    }
-
     LaunchedEffect(start) {
         when (start) {
-            PayStart.ScanQr -> scanner.launch(
-                ScanOptions()
-                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                    .setPrompt("Point the camera at a UPI QR code")
-                    .setBeepEnabled(false)
-                    .setOrientationLocked(true)
+            PayStart.ScanQr -> scanQr(
+                context = context,
+                onText = { text ->
+                    val scanned = UpiLink.parse(text)
+                    if (scanned != null) request = scanned
+                    else problem = "That QR code is not a UPI payment code."
+                },
+                onProblem = { problem = it },
             )
             PayStart.EnterUpiId -> showUpiIdDialog = true
             null -> return@LaunchedEffect
@@ -159,6 +157,27 @@ fun PayFlow(
     }
 }
 
+// Opens Google's QR scanner. It is the same scanner Google's own apps use, so it reads
+// codes quickly, including ones on screens or with a logo in the middle.
+private fun scanQr(context: Context, onText: (String) -> Unit, onProblem: (String) -> Unit) {
+    val options = GmsBarcodeScannerOptions.Builder()
+        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+        .enableAutoZoom()
+        .build()
+    GmsBarcodeScanning.getClient(context, options)
+        .startScan()
+        .addOnSuccessListener { barcode ->
+            val text = barcode.rawValue
+            if (text != null) onText(text) else onProblem("That QR code could not be read.")
+        }
+        .addOnFailureListener {
+            onProblem(
+                "The scanner could not start. Connect to the internet once so Google Play " +
+                        "services can set it up, then try again."
+            )
+        }
+}
+
 @Composable
 private fun UpiIdDialog(onDismiss: () -> Unit, onContinue: (UpiRequest) -> Unit) {
     var id by rememberSaveable { mutableStateOf("") }
@@ -194,7 +213,7 @@ private fun UpiIdDialog(onDismiss: () -> Unit, onContinue: (UpiRequest) -> Unit)
     )
 }
 
-// The envelope check: shows what each envelope has now and what it would have after paying.
+// The envelope check: pick an envelope, see what it would have left, then choose a payment app.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PaySheet(
@@ -209,8 +228,13 @@ private fun PaySheet(
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val amountPaise = rupeesToPaise(amount)
     val selected = envelopes.firstOrNull { it.id == selectedId }
+    val ready = selected != null && amountPaise != null
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Open at full height, so the payment apps are never hidden below the edge of the screen.
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -244,38 +268,38 @@ private fun PaySheet(
                     text = "Create an envelope first, then come back to pay.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            envelopes.forEach { envelope ->
-                val after = amountPaise?.let { envelope.remainingPaise - it }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedId = envelope.id },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = selectedId == envelope.id,
-                        onClick = { selectedId = envelope.id },
-                    )
-                    Column {
-                        Text(envelope.name, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            text = when {
-                                after == null -> "${envelope.remainingPaise.toRupeeString()} left"
-                                after >= 0 -> "${envelope.remainingPaise.toRupeeString()} left, " +
-                                    "${after.toRupeeString()} after this"
-                                else -> "${envelope.remainingPaise.toRupeeString()} left, " +
-                                    "this goes over by ${(-after).toRupeeString()}"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (after != null && after < 0) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+            } else {
+                // Envelopes sit side by side, so a long list does not push the payment apps away.
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(envelopes, key = { it.id }) { envelope ->
+                        FilterChip(
+                            selected = selectedId == envelope.id,
+                            onClick = { selectedId = envelope.id },
+                            label = { Text(envelope.name) },
                         )
                     }
                 }
             }
 
-            val ready = selected != null && amountPaise != null
+            val after = if (selected != null && amountPaise != null) {
+                selected.remainingPaise - amountPaise
+            } else {
+                null
+            }
+            Text(
+                text = when {
+                    selected == null -> "Pick the envelope this payment comes from."
+                    after == null -> "${selected.name} has ${selected.remainingPaise.toRupeeString()} left."
+                    after >= 0 -> "${selected.name} has ${selected.remainingPaise.toRupeeString()} left. " +
+                        "After this payment: ${after.toRupeeString()}."
+                    else -> "${selected.name} has ${selected.remainingPaise.toRupeeString()} left. " +
+                        "This payment goes over by ${(-after).toRupeeString()}."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (after != null && after < 0) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (apps.isEmpty()) {
                 Button(
                     onClick = { if (selected != null && amountPaise != null) onPay(selected, amountPaise, null) },
@@ -290,13 +314,6 @@ private fun PaySheet(
                     else "Pay with",
                     style = MaterialTheme.typography.titleSmall,
                 )
-                if (!ready) {
-                    Text(
-                        text = "Enter an amount and pick an envelope first.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(apps, key = { it.packageName }) { app ->
                         Column(
@@ -328,6 +345,13 @@ private fun PaySheet(
                             )
                         }
                     }
+                }
+                if (!ready) {
+                    Text(
+                        text = "Enter an amount and pick an envelope to continue.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -38,7 +38,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.zxing.android.embedded)
+    implementation(libs.play.services.code.scanner)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.compose.material.icons.core)
