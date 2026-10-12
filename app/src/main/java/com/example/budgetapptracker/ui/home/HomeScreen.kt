@@ -92,6 +92,8 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.budgetapptracker.ui.pay.PayFlow
+import com.example.budgetapptracker.ui.pay.PayStart
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
 
@@ -140,6 +142,8 @@ private fun panelColors() =
 
 // What the + button in the bottom bar can ask this screen to do.
 enum class HomeAction(val label: String) {
+    ScanAndPay("Scan and pay"),
+    PayUpiId("Pay by UPI ID"),
     AddExpense("Add expense"),
     AddIncome("Add income"),
     NewEnvelope("New envelope"),
@@ -163,11 +167,14 @@ fun HomeScreen(
     var showAddIncome by rememberSaveable { mutableStateOf(false) }
     var showPickEnvelope by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var payStart by remember { mutableStateOf<PayStart?>(null) }
     var expenseTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
     var budgetTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
 
     LaunchedEffect(action) {
         when (action) {
+            HomeAction.ScanAndPay -> payStart = PayStart.ScanQr
+            HomeAction.PayUpiId -> payStart = PayStart.EnterUpiId
             HomeAction.AddExpense -> showPickEnvelope = true
             HomeAction.AddIncome -> showAddIncome = true
             HomeAction.NewEnvelope -> showAddEnvelope = true
@@ -215,6 +222,12 @@ fun HomeScreen(
             )
         }
     }
+    PayFlow(
+        start = payStart,
+        onStartHandled = { payStart = null },
+        envelopes = envelopes,
+        viewModel = viewModel,
+    )
 
     if (showSettings) {
         SettingsDialog(

@@ -71,6 +71,22 @@ interface BudgetDao {
 
     @Query("UPDATE transactions SET excluded = 0 WHERE id = :id")
     suspend fun restoreTransaction(id: String)
+    @Query("SELECT COUNT(*) FROM transactions WHERE smsKey = :smsKey")
+    suspend fun countSmsKey(smsKey: String): Int
+
+    // An expense of the same amount, recorded without an SMS, close to when the SMS arrived.
+    @Query(
+        """
+        SELECT id FROM transactions
+        WHERE smsKey IS NULL AND excluded = 0 AND amountPaise = :amountPaise
+          AND occurredAt >= :from AND occurredAt <= :until
+        ORDER BY occurredAt DESC LIMIT 1
+        """
+    )
+    suspend fun findUnlinkedExpense(amountPaise: Long, from: Long, until: Long): String?
+
+    @Query("UPDATE transactions SET smsKey = :smsKey WHERE id = :id")
+    suspend fun linkSms(id: String, smsKey: String)
 
     @Query("DELETE FROM merchant_rules WHERE merchant = :merchant")
     suspend fun deleteRule(merchant: String)

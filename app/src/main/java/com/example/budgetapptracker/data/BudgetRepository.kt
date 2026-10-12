@@ -4,6 +4,9 @@ import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 
+// How far apart an expense and its bank SMS can be and still count as the same payment.
+private const val MATCH_BEFORE_MILLIS = 30 * 60 * 1_000L
+private const val MATCH_AFTER_MILLIS = 2 * 60 * 1_000L
 class BudgetRepository(private val dao: BudgetDao) {
 
     fun observeEnvelopes(month: YearMonth): Flow<List<EnvelopeSummary>> {
@@ -41,12 +44,18 @@ class BudgetRepository(private val dao: BudgetDao) {
         dao.insertIncome(IncomeEntity(amountPaise = amountPaise, source = source.trim()))
     }
 
-    suspend fun addExpense(categoryId: String, amountPaise: Long, merchant: String) {
+    suspend fun addExpense(
+        categoryId: String,
+        amountPaise: Long,
+        merchant: String,
+        source: String = "MANUAL",
+    ) {
         dao.insertTransaction(
             TransactionEntity(
                 amountPaise = amountPaise,
                 categoryId = categoryId,
                 merchant = merchant.trim(),
+                source = source,
             )
         )
     }
@@ -58,6 +67,19 @@ class BudgetRepository(private val dao: BudgetDao) {
         occurredAt: Long,
         smsKey: String,
     ): TransactionEntity? {
+        if (dao.countSmsKey(smsKey) > 0) return null
+
+        // Already recorded by hand or by paying through the app? Attach this SMS to that
+        // expense instead of adding the same payment a second time.
+        val existing = dao.findUnlinkedExpense(
+            amountPaise = amountPaise,
+            from = occurredAt - MATCH_BEFORE_MILLIS,
+            until = occurredAt + MATCH_AFTER_MILLIS,
+        )
+        if (existing != null) {
+            dao.linkSms(existing, smsKey)
+            return null
+        }
         val expense = TransactionEntity(
             amountPaise = amountPaise,
             categoryId = dao.findRuleCategory(merchant.uppercase()),

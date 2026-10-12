@@ -27,8 +27,16 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.asStateFlow
 
 data class DaySpend(val label: String, val amountPaise: Long)
+// A payment handed to a UPI app that we have not yet heard the result of.
+data class PendingPayment(
+    val envelopeId: String,
+    val envelopeName: String,
+    val amountPaise: Long,
+    val payee: String,
+)
 
 class HomeViewModel(
     private val repository: BudgetRepository,
@@ -42,6 +50,8 @@ class HomeViewModel(
     val lockEnabled: StateFlow<Boolean> = userPrefs.lockEnabled
     val themeMode: StateFlow<ThemeMode> = userPrefs.themeMode
 
+    private val _pendingPayment = MutableStateFlow<PendingPayment?>(null)
+    val pendingPayment: StateFlow<PendingPayment?> = _pendingPayment.asStateFlow()
     val envelopes: StateFlow<List<EnvelopeSummary>> =
         repository.observeEnvelopes(month)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -84,6 +94,24 @@ class HomeViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    fun startPayment(payment: PendingPayment) {
+        _pendingPayment.value = payment
+    }
+
+    fun finishPayment(paid: Boolean) {
+        val payment = _pendingPayment.value ?: return
+        _pendingPayment.value = null
+        if (paid) {
+            viewModelScope.launch {
+                repository.addExpense(
+                    categoryId = payment.envelopeId,
+                    amountPaise = payment.amountPaise,
+                    merchant = payment.payee,
+                    source = "UPI",
+                )
+            }
+        }
+    }
     fun saveProfile(name: String, lockEnabled: Boolean) {
         userPrefs.save(name, lockEnabled)
     }

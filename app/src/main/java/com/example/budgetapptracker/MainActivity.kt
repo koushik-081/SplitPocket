@@ -23,7 +23,8 @@ import com.example.budgetapptracker.ui.AppRoot
 import com.example.budgetapptracker.ui.start.LockScreen
 import com.example.budgetapptracker.ui.start.WelcomeScreen
 import com.example.budgetapptracker.ui.theme.BudgetAppTrackerTheme
-
+import android.os.SystemClock
+private const val LOCK_AFTER_MILLIS = 60 * 1_000L
 // FragmentActivity (instead of ComponentActivity) is required by the fingerprint prompt.
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,9 +56,17 @@ class MainActivity : FragmentActivity() {
                 val lockAvailable = remember { canUseAppLock(this@MainActivity) }
                 var unlocked by rememberSaveable { mutableStateOf(false) }
 
-                // Lock again whenever the app leaves the screen, but not on rotation.
+                // Lock again after the app has been away for a while. A short trip to the
+                // QR scanner or a payment app does not count, and neither does rotation.
+                var leftAt by rememberSaveable { mutableStateOf(0L) }
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-                    if (!isChangingConfigurations) unlocked = false
+                    if (!isChangingConfigurations) leftAt = SystemClock.elapsedRealtime()
+                }
+                LifecycleEventEffect(Lifecycle.Event.ON_START) {
+                    if (leftAt != 0L && SystemClock.elapsedRealtime() - leftAt > LOCK_AFTER_MILLIS) {
+                        unlocked = false
+                    }
+                    leftAt = 0L
                 }
 
                 when {
