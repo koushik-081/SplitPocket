@@ -59,6 +59,10 @@ import android.content.Context
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+import androidx.compose.material3.Switch
 
 enum class PayStart { ScanQr, EnterUpiId }
 
@@ -109,20 +113,33 @@ fun PayFlow(
             request = current,
             envelopes = envelopes,
             onDismiss = { request = null },
-            onPay = { envelope, amountPaise, app ->
+            onPay = { envelope, amountPaise, app, payInsideApp ->
                 val amountRupees = BigDecimal.valueOf(amountPaise, 2).toPlainString()
                 val view = Intent(Intent.ACTION_VIEW, UpiLink.build(current, amountRupees))
+                // The payment app's normal home screen, used when the user pays inside it.
+                val home = app?.let { context.packageManager.getLaunchIntentForPackage(it.packageName) }
                 request = null
                 // Remember what was being paid, so we can ask about it when the user comes back.
                 viewModel.startPayment(
                     PendingPayment(envelope.id, envelope.name, amountPaise, current.payeeName)
                 )
-                if (app != null) {
+                when {
+                    payInsideApp && app != null && home != null -> {
+                        // Copy the UPI ID and just open the app. The user pastes it and pays there,
+                        // which the app treats as an ordinary payment with ordinary limits.
+                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        clipboard.setPrimaryClip(ClipData.newPlainText("UPI ID", current.payeeId))
+                        Toast.makeText(
+                            context,
+                            "UPI ID copied. Paste it in ${app.label} and pay ${amountPaise.toRupeeString()}.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        context.startActivity(home)
+                    }
                     // Open the chosen payment app directly, with the payee and amount filled in.
-                    context.startActivity(view.setPackage(app.packageName))
-                } else {
+                    app != null -> context.startActivity(view.setPackage(app.packageName))
                     // No app list available: fall back to Android's own chooser.
-                    context.startActivity(Intent.createChooser(view, "Pay with"))
+                    else -> context.startActivity(Intent.createChooser(view, "Pay with"))
                 }
             },
         )
@@ -220,10 +237,11 @@ private fun PaySheet(
     request: UpiRequest,
     envelopes: List<EnvelopeSummary>,
     onDismiss: () -> Unit,
-    onPay: (EnvelopeSummary, Long, UpiApp?) -> Unit,
+    onPay: (EnvelopeSummary, Long, UpiApp?, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val apps = remember { installedUpiApps(context) }
+    var payInsideApp by rememberSaveable { mutableStateOf(false) }
     var amount by rememberSaveable { mutableStateOf(request.fixedAmountRupees.orEmpty()) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val amountPaise = rupeesToPaise(amount)
@@ -302,7 +320,7 @@ private fun PaySheet(
 
             if (apps.isEmpty()) {
                 Button(
-                    onClick = { if (selected != null && amountPaise != null) onPay(selected, amountPaise, null) },
+                    onClick = { if (selected != null && amountPaise != null) onPay(selected, amountPaise, null, false) },
                     enabled = ready,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
@@ -323,7 +341,7 @@ private fun PaySheet(
                                 .alpha(if (ready) 1f else 0.4f)
                                 .clickable(enabled = ready) {
                                     if (selected != null && amountPaise != null) {
-                                        onPay(selected, amountPaise, app)
+                                        onPay(selected, amountPaise, app, payInsideApp)
                                     }
                                 }
                                 .padding(vertical = 8.dp),
@@ -352,6 +370,22 @@ private fun PaySheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                // For when a payment app refuses a payment that was started from here.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Pay inside the app instead",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = "Copies the UPI ID and opens the app, so you pay there as usual. " +
+                                    "Use this if the app refuses the payment.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = payInsideApp, onCheckedChange = { payInsideApp = it })
                 }
             }
         }
