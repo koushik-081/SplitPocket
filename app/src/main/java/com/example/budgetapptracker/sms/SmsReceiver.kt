@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.budgetapptracker.notify.ExpenseNotifier
+import java.time.YearMonth
+import kotlinx.coroutines.flow.first
 
 private const val SAVE_DELAY_MILLIS = 3_000L
 private const val LOOK_BACK_MILLIS = 10 * 60 * 1_000L
@@ -33,7 +36,12 @@ class SmsReceiver : BroadcastReceiver() {
                 // The phone's messaging app saves the SMS a moment after this broadcast,
                 // so wait, then run the same import the Scan SMS button uses.
                 delay(SAVE_DELAY_MILLIS)
-                app.smsImporter.importSince(System.currentTimeMillis() - LOOK_BACK_MILLIS)
+                val added = app.smsImporter.importSince(System.currentTimeMillis() - LOOK_BACK_MILLIS)
+                if (added.isNotEmpty()) {
+                    // Tell the user about each new expense, with their envelopes as buttons.
+                    val envelopes = app.repository.observeEnvelopes(YearMonth.now()).first()
+                    added.forEach { ExpenseNotifier.show(context, it, envelopes) }
+                }
             } catch (e: SecurityException) {
                 // SMS permission was not granted or has been removed; nothing to do.
             } finally {

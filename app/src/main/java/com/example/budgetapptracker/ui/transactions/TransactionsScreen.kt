@@ -2,6 +2,7 @@ package com.example.budgetapptracker.ui.transactions
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -64,10 +65,14 @@ import java.time.format.DateTimeFormatter
 
 private const val UNKNOWN_MERCHANT = "UNKNOWN"
 // Reading old messages and being told about new ones are two separate permissions.
-private val smsPermissions = arrayOf(
-    Manifest.permission.READ_SMS,
-    Manifest.permission.RECEIVE_SMS,
-)
+// From Android 13, showing notifications needs the user's permission as well.
+private val smsPermissions = buildList {
+    add(Manifest.permission.READ_SMS)
+    add(Manifest.permission.RECEIVE_SMS)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}.toTypedArray()
 
 private val dateFormat = DateTimeFormatter.ofPattern("d MMM, h:mm a")
 
