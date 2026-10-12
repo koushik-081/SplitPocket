@@ -56,3 +56,47 @@ data class MerchantRuleEntity(
     @PrimaryKey val merchant: String,
     val categoryId: String,
 )
+// Someone you lend to, borrow from or split expenses with.
+@Entity(tableName = "people")
+data class PersonEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val phone: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+// A named group such as "Goa trip" or "Flat". Used from the next step.
+@Entity(tableName = "split_groups")
+data class GroupEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+// One line in the ledger with a person. Positive: they owe you. Negative: you owe them.
+@Entity(
+    tableName = "debts",
+    foreignKeys = [
+        ForeignKey(
+            entity = PersonEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["personId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = GroupEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["groupId"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("personId"), Index("groupId")],
+)
+data class DebtEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val personId: String,
+    val groupId: String? = null,
+    val amountPaise: Long,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)

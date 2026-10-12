@@ -27,8 +27,57 @@ data class TransactionRow(
     val remembered: Boolean,
 )
 
+data class PersonBalance(
+    val id: String,
+    val name: String,
+    val phone: String?,
+    val balancePaise: Long,
+)
+
+data class DebtRow(
+    val id: String,
+    val amountPaise: Long,
+    val note: String,
+    val createdAt: Long,
+    val groupName: String?,
+)
 @Dao
 interface BudgetDao {
+
+@Insert
+suspend fun insertPerson(person: PersonEntity)
+
+@Insert
+suspend fun insertDebt(debt: DebtEntity)
+
+@Query("DELETE FROM debts WHERE id = :id")
+suspend fun deleteDebt(id: String)
+
+@Query("DELETE FROM people WHERE id = :id")
+suspend fun deletePerson(id: String)
+
+// One row per person with everything they owe you, minus everything you owe them.
+@Query(
+    """
+        SELECT p.id, p.name, p.phone, COALESCE(SUM(d.amountPaise), 0) AS balancePaise
+        FROM people p
+        LEFT JOIN debts d ON d.personId = p.id
+        GROUP BY p.id
+        ORDER BY p.name COLLATE NOCASE
+        """
+)
+fun observePeople(): Flow<List<PersonBalance>>
+
+@Query(
+    """
+        SELECT d.id, d.amountPaise, d.note, d.createdAt, g.name AS groupName
+        FROM debts d
+        LEFT JOIN split_groups g ON g.id = d.groupId
+        WHERE d.personId = :personId
+        ORDER BY d.createdAt DESC
+        """
+)
+fun observeDebts(personId: String): Flow<List<DebtRow>>
     @Insert
     suspend fun insertCategory(category: CategoryEntity)
 

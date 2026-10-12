@@ -116,6 +116,26 @@ class BudgetRepository(private val dao: BudgetDao) {
         dao.excludeSmsTransaction(id)
         dao.deleteManualTransaction(id)
     }
+    fun observePeople(): Flow<List<PersonBalance>> = dao.observePeople()
+
+    fun observeDebts(personId: String): Flow<List<DebtRow>> = dao.observeDebts(personId)
+
+    suspend fun addPerson(name: String, phone: String) {
+        dao.insertPerson(PersonEntity(name = name.trim(), phone = phone.trim().ifBlank { null }))
+    }
+
+    // Positive: they owe you. Negative: you owe them.
+    suspend fun addDebt(personId: String, signedPaise: Long, note: String) {
+        dao.insertDebt(DebtEntity(personId = personId, amountPaise = signedPaise, note = note))
+    }
+
+    suspend fun deleteDebt(id: String) {
+        dao.deleteDebt(id)
+    }
+
+    suspend fun deletePerson(id: String) {
+        dao.deletePerson(id)
+    }
 
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {
         val zone = ZoneId.systemDefault()

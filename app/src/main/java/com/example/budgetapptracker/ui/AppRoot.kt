@@ -45,10 +45,13 @@ import com.example.budgetapptracker.ui.theme.LocalAppColors
 import com.example.budgetapptracker.ui.home.HomeScreen
 import com.example.budgetapptracker.ui.insights.InsightsScreen
 import com.example.budgetapptracker.ui.transactions.TransactionsScreen
+import androidx.compose.material.icons.rounded.Group
+import com.example.budgetapptracker.ui.people.PeopleScreen
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
     Activity("Activity", Icons.AutoMirrored.Rounded.ReceiptLong),
+    People("People", Icons.Rounded.Group),
     Insights("Insights", Icons.Rounded.Insights),
 }
 
@@ -79,6 +82,7 @@ fun AppRoot() {
                         onActionHandled = { pendingAction = null },
                     )
                     Tab.Activity -> TransactionsScreen()
+                    Tab.People -> PeopleScreen()
                     Tab.Insights -> InsightsScreen()
                 }
             }
@@ -99,7 +103,7 @@ private fun BottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -138,6 +142,11 @@ private fun BottomBar(
                     }
                 }
             }
+            BarItem(
+                tab = Tab.People,
+                selected = selected == Tab.People,
+                onClick = { onSelect(Tab.People) },
+            )
 
             BarItem(
                 tab = Tab.Insights,
@@ -157,7 +166,7 @@ private fun BarItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(imageVector = tab.icon, contentDescription = null, tint = color)
