@@ -47,6 +47,7 @@ import com.example.budgetapptracker.ui.insights.InsightsScreen
 import com.example.budgetapptracker.ui.transactions.TransactionsScreen
 import androidx.compose.material.icons.rounded.Group
 import com.example.budgetapptracker.ui.people.PeopleScreen
+import androidx.compose.runtime.LaunchedEffect
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
@@ -56,9 +57,17 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun AppRoot() {
+fun AppRoot(
+    expenseToOpen: String? = null,
+    onExpenseOpened: () -> Unit = {},
+) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var pendingAction by remember { mutableStateOf<HomeAction?>(null) }
+
+    // A tapped notification jumps to Activity, which then opens that expense.
+    LaunchedEffect(expenseToOpen) {
+        if (expenseToOpen != null) tab = Tab.Activity
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -81,7 +90,10 @@ fun AppRoot() {
                         action = pendingAction,
                         onActionHandled = { pendingAction = null },
                     )
-                    Tab.Activity -> TransactionsScreen()
+                    Tab.Activity -> TransactionsScreen(
+                        expenseToOpen = expenseToOpen,
+                        onExpenseOpened = onExpenseOpened,
+                    )
                     Tab.People -> PeopleScreen()
                     Tab.Insights -> InsightsScreen()
                 }

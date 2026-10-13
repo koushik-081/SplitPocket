@@ -24,12 +24,31 @@ import com.example.budgetapptracker.ui.start.LockScreen
 import com.example.budgetapptracker.ui.start.WelcomeScreen
 import com.example.budgetapptracker.ui.theme.BudgetAppTrackerTheme
 import android.os.SystemClock
+import android.content.Intent
+import com.example.budgetapptracker.notify.EXTRA_TRANSACTION_ID
 private const val LOCK_AFTER_MILLIS = 60 * 1_000L
 // FragmentActivity (instead of ComponentActivity) is required by the fingerprint prompt.
 class MainActivity : FragmentActivity() {
+    // The expense whose notification was tapped, until its envelope chooser has opened.
+    private var expenseToOpen by mutableStateOf<String?>(null)
+
+    // Called when a notification is tapped while the app is already open.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readTappedExpense(intent)
+    }
+
+    private fun readTappedExpense(intent: Intent) {
+        val id = intent.getStringExtra(EXTRA_TRANSACTION_ID) ?: return
+        expenseToOpen = id
+        // Forget it, so rotating the screen does not open the chooser a second time.
+        intent.removeExtra(EXTRA_TRANSACTION_ID)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) readTappedExpense(intent)
         val userPrefs = (application as BudgetApp).userPrefs
 
         setContent {
@@ -80,7 +99,10 @@ class MainActivity : FragmentActivity() {
                     lockEnabled && lockAvailable && !unlocked -> LockScreen(
                         onUnlock = { promptUnlock { unlocked = true } },
                     )
-                    else -> AppRoot()
+                    else -> AppRoot(
+                        expenseToOpen = expenseToOpen,
+                        onExpenseOpened = { expenseToOpen = null },
+                    )
                 }
             }
         }

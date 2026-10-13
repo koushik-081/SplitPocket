@@ -7,6 +7,11 @@ import kotlinx.coroutines.flow.Flow
 // How far apart an expense and its bank SMS can be and still count as the same payment.
 private const val MATCH_BEFORE_MILLIS = 30 * 60 * 1_000L
 private const val MATCH_AFTER_MILLIS = 2 * 60 * 1_000L
+// A payment app can show the same payment more than once, and the bank SMS may land first.
+private const val SAME_PAYMENT_BEFORE_MILLIS = 3 * 60 * 1_000L
+private const val SAME_PAYMENT_AFTER_MILLIS = 60 * 1_000L
+// How long ago a captured expense can be and still be the payment just made through the app.
+private const val JUST_PAID_MILLIS = 10 * 60 * 1_000L
 class BudgetRepository(private val dao: BudgetDao) {
 
     fun observeEnvelopes(month: YearMonth): Flow<List<EnvelopeSummary>> {
@@ -50,6 +55,18 @@ class BudgetRepository(private val dao: BudgetDao) {
         merchant: String,
         source: String = "MANUAL",
     ) {
+        if (source == "UPI") {
+            // Paid through the app: the bank SMS or the payment app's notification may have
+            // recorded this payment already. Put that one in the envelope instead of adding a twin.
+            val captured = dao.findCapturedWithoutEnvelope(
+                amountPaise = amountPaise,
+                from = System.currentTimeMillis() - JUST_PAID_MILLIS,
+            )
+            if (captured != null) {
+                dao.setTransactionCategory(captured, categoryId)
+                return
+            }
+        }
         dao.insertTransaction(
             TransactionEntity(
                 amountPaise = amountPaise,
@@ -91,6 +108,30 @@ class BudgetRepository(private val dao: BudgetDao) {
         return expense.takeIf { dao.insertTransactionIfNew(it) != -1L }
     }
 
+    // An expense seen in a payment app's notification. Returns it, or null when the same
+    // payment is already recorded (by bank SMS, by hand, or by an earlier notification).
+    suspend fun addNotifiedExpense(
+        amountPaise: Long,
+        merchant: String,
+        occurredAt: Long,
+    ): TransactionEntity? {
+        val existing = dao.findSameAmountNear(
+            amountPaise = amountPaise,
+            from = occurredAt - SAME_PAYMENT_BEFORE_MILLIS,
+            until = occurredAt + SAME_PAYMENT_AFTER_MILLIS,
+        )
+        if (existing != null) return null
+
+        val expense = TransactionEntity(
+            amountPaise = amountPaise,
+            categoryId = dao.findRuleCategory(merchant.uppercase()),
+            merchant = merchant,
+            occurredAt = occurredAt,
+            source = "APP",
+        )
+        dao.insertTransaction(expense)
+        return expense
+    }
     suspend fun assignCategory(
         transactionId: String,
         merchant: String,

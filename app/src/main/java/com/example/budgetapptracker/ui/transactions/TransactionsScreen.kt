@@ -89,7 +89,9 @@ private fun looksLikePerson(merchant: String): Boolean =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
-    viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory),
+expenseToOpen: String? = null,
+onExpenseOpened: () -> Unit = {},
+viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory),
 ) {
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -108,7 +110,17 @@ fun TransactionsScreen(
         if (results[Manifest.permission.READ_SMS] == true) viewModel.scanSms()
         else viewModel.showMessage("SMS permission is needed to scan for expenses")
     }
-
+// Arrived from a tapped notification: show every expense, then open that one.
+    LaunchedEffect(expenseToOpen, transactions) {
+        if (expenseToOpen == null) return@LaunchedEffect
+        if (selected != null) viewModel.selectFilter(null)
+        if (searchQuery.isNotEmpty()) viewModel.search("")
+        val target = transactions.firstOrNull { it.id == expenseToOpen }
+        if (target != null) {
+            openTransaction = target
+            onExpenseOpened()
+        }
+    }
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it)

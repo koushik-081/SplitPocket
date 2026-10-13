@@ -95,6 +95,7 @@ import java.util.Locale
 import com.example.budgetapptracker.ui.pay.PayFlow
 import com.example.budgetapptracker.ui.pay.PayStart
 import com.example.budgetapptracker.ui.backup.BackupSection
+import com.example.budgetapptracker.ui.capture.PaymentCaptureSection
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
 
@@ -481,7 +482,10 @@ private fun SettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Settings") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(24) },
@@ -516,6 +520,7 @@ private fun SettingsDialog(
                         enabled = lockAvailable,
                     )
                 }
+                PaymentCaptureSection()
                 BackupSection()
             }
         },

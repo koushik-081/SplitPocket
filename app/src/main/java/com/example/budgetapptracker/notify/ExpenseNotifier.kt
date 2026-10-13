@@ -12,6 +12,7 @@ import com.example.budgetapptracker.R
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.TransactionEntity
 import com.example.budgetapptracker.util.toRupeeString
+import com.example.budgetapptracker.MainActivity
 
 private const val CHANNEL_ID = "captured_expenses"
 private const val MAX_BUTTONS = 3
@@ -33,13 +34,16 @@ object ExpenseNotifier {
         val notificationId = expense.id.hashCode()
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
-        // Tapping the notification itself opens the app.
-        val openApp = PendingIntent.getActivity(
-            context,
-            notificationId,
-            context.packageManager.getLaunchIntentForPackage(context.packageName),
-            flags,
-        )
+        // Tapping the notification itself opens the app on this expense, where every
+        // envelope can be chosen. The flags reuse the open screen instead of stacking a new one.
+        val openExpense = Intent(context, MainActivity::class.java)
+            .addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+            )
+            .putExtra(EXTRA_TRANSACTION_ID, expense.id)
+        val openApp = PendingIntent.getActivity(context, notificationId, openExpense, flags)
 
         // A remembered payee is already in its envelope; anything else needs a choice.
         val assigned = envelopes.firstOrNull { it.id == expense.categoryId }
@@ -48,7 +52,8 @@ object ExpenseNotifier {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("${expense.amountPaise.toRupeeString()} at ${expense.merchant}")
             .setContentText(
-                if (assigned != null) "Added to ${assigned.name}" else "Which envelope is this from?"
+                if (assigned != null) "Added to ${assigned.name}"
+                else "Tap to choose from all your envelopes"
             )
             .setContentIntent(openApp)
             .setAutoCancel(true)

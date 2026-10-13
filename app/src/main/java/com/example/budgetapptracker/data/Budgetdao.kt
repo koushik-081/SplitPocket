@@ -228,6 +228,27 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     )
     suspend fun findUnlinkedExpense(amountPaise: Long, from: Long, until: Long): String?
 
+    // Any expense of this amount around this time, however it was recorded.
+    @Query(
+        """
+        SELECT id FROM transactions
+        WHERE (amountPaise = :amountPaise OR paidPaise = :amountPaise)
+          AND occurredAt >= :from AND occurredAt <= :until
+        LIMIT 1
+        """
+    )
+    suspend fun findSameAmountNear(amountPaise: Long, from: Long, until: Long): String?
+
+    // An expense picked up automatically (bank SMS or payment app) that has no envelope yet.
+    @Query(
+        """
+        SELECT id FROM transactions
+        WHERE source IN ('SMS', 'APP') AND categoryId IS NULL AND excluded = 0
+          AND amountPaise = :amountPaise AND occurredAt >= :from
+        ORDER BY occurredAt DESC LIMIT 1
+        """
+    )
+    suspend fun findCapturedWithoutEnvelope(amountPaise: Long, from: Long): String?
     @Query("UPDATE transactions SET smsKey = :smsKey WHERE id = :id")
     suspend fun linkSms(id: String, smsKey: String)
 
