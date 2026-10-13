@@ -191,6 +191,27 @@ class BudgetRepository(private val dao: BudgetDao) {
         }
         dao.insertSplit(expense, debts)
     }
+    // Splits an expense you have already paid, equally between you and the chosen people.
+    // The expense shrinks to your share; each of the others now owes you theirs.
+    suspend fun splitExpense(
+        transactionId: String,
+        merchant: String,
+        totalPaise: Long,
+        sharedWithIds: List<String>,
+    ) {
+        if (sharedWithIds.isEmpty()) return
+        val plan = planEqualSplit(totalPaise, otherPeople = sharedWithIds.size)
+        val debts = sharedWithIds.map {
+            DebtEntity(personId = it, amountPaise = plan.otherSharePaise, note = merchant)
+        }
+        dao.splitExisting(
+            id = transactionId,
+            sharePaise = plan.mySharePaise,
+            totalPaise = totalPaise,
+            note = "Your share of a ${sharedWithIds.size + 1}-way split",
+            debts = debts,
+        )
+    }
 
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {
         val zone = ZoneId.systemDefault()

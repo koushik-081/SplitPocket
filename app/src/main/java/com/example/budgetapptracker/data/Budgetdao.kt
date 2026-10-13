@@ -26,6 +26,8 @@ data class TransactionRow(
     val categoryName: String?,
     // True when "Remember for this payee" is saved for this merchant.
     val remembered: Boolean,
+    // The full amount paid, when this expense has been split and amountPaise is only your share.
+    val paidPaise: Long?,
 )
 
 data class PersonBalance(
@@ -189,6 +191,28 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
 
     @Query("UPDATE transactions SET excluded = 0 WHERE id = :id")
     suspend fun restoreTransaction(id: String)
+    // Shrinks an expense to your own share and remembers the full amount that was paid.
+    // Does nothing if the expense has been split before. Returns how many rows changed.
+    @Query(
+        """
+        UPDATE transactions SET amountPaise = :sharePaise, paidPaise = :totalPaise, note = :note
+        WHERE id = :id AND paidPaise IS NULL
+        """
+    )
+    suspend fun shrinkToShare(id: String, sharePaise: Long, totalPaise: Long, note: String): Int
+
+    // Splits an expense that is already recorded: one step, so the expense and the
+    // debts can never disagree.
+    @Transaction
+    suspend fun splitExisting(
+        id: String,
+        sharePaise: Long,
+        totalPaise: Long,
+        note: String,
+        debts: List<DebtEntity>,
+    ) {
+        if (shrinkToShare(id, sharePaise, totalPaise, note) == 1) insertDebts(debts)
+    }
     @Query("SELECT COUNT(*) FROM transactions WHERE smsKey = :smsKey")
     suspend fun countSmsKey(smsKey: String): Int
 
@@ -240,7 +264,7 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
         """
         SELECT t.id, t.amountPaise, t.merchant, t.occurredAt, t.source, t.categoryId,
                c.name AS categoryName,
-               EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered
+               EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered,t.paidPaise
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.categoryId
         WHERE t.occurredAt >= :from AND t.occurredAt < :until

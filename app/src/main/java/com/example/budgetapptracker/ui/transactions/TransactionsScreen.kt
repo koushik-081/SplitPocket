@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +57,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.EnvelopeSummary
+import com.example.budgetapptracker.data.PersonBalance
+import com.example.budgetapptracker.data.planEqualSplit
 import com.example.budgetapptracker.data.TransactionRow
 import com.example.budgetapptracker.ui.theme.transparentTopBarColors
 import com.example.budgetapptracker.util.toRupeeString
@@ -93,7 +96,9 @@ fun TransactionsScreen(
     val selected by viewModel.filter.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val people by viewModel.people.collectAsStateWithLifecycle()
     var openTransaction by remember { mutableStateOf<TransactionRow?>(null) }
+    var splitTransaction by remember { mutableStateOf<TransactionRow?>(null) }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -258,8 +263,24 @@ fun TransactionsScreen(
                     viewModel.remove(target.id)
                     openTransaction = null
                 },
+                onSplit = {
+                    splitTransaction = target
+                    openTransaction = null
+                },
             )
         }
+    }
+
+    splitTransaction?.let { target ->
+        SplitDialog(
+            transaction = target,
+            people = people,
+            onDismiss = { splitTransaction = null },
+            onSplit = { personIds ->
+                viewModel.split(target, personIds)
+                splitTransaction = null
+            },
+        )
     }
 }
 
@@ -270,6 +291,7 @@ private fun AssignDialog(
     onDismiss: () -> Unit,
     onAssign: (String, Boolean) -> Unit,
     onRemove: () -> Unit,
+    onSplit: () -> Unit,
 ) {
     val canRemember = transaction.merchant != UNKNOWN_MERCHANT
     var selectedId by remember { mutableStateOf(transaction.categoryId) }
@@ -321,6 +343,17 @@ private fun AssignDialog(
                     }
                 }
 
+                val paidPaise = transaction.paidPaise
+                if (paidPaise == null && transaction.source != "SPLIT") {
+                    TextButton(onClick = onSplit) { Text("Split with people") }
+                } else if (paidPaise != null && paidPaise != transaction.amountPaise) {
+                    Text(
+                        text = "Split: you paid ${paidPaise.toRupeeString()}, and this is your share.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+
                 TextButton(onClick = onRemove) {
                     Text(
                         text = if (transaction.source == "SMS") "Not an expense" else "Delete",
@@ -334,6 +367,63 @@ private fun AssignDialog(
                 enabled = selectedId != null,
                 onClick = { selectedId?.let { onAssign(it, rememberPayee && canRemember) } },
             ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+// Choose who shared an expense you have already paid. It is divided equally.
+@Composable
+private fun SplitDialog(
+    transaction: TransactionRow,
+    people: List<PersonBalance>,
+    onDismiss: () -> Unit,
+    onSplit: (List<String>) -> Unit,
+) {
+    var chosen by remember { mutableStateOf(emptySet<String>()) }
+    val plan = planEqualSplit(transaction.amountPaise, otherPeople = chosen.size)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Split ${transaction.amountPaise.toRupeeString()}") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "${transaction.merchant} · ${transaction.occurredAt.toDateText()}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+
+                if (people.isEmpty()) {
+                    Text("Add people on the People tab first.")
+                }
+                people.forEach { person ->
+                    val toggle = {
+                        chosen = if (person.id in chosen) chosen - person.id else chosen + person.id
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { toggle() },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = person.id in chosen, onCheckedChange = { toggle() })
+                        Text(person.name)
+                    }
+                }
+
+                if (chosen.isNotEmpty()) {
+                    Text(
+                        text = "Each of them owes you ${plan.otherSharePaise.toRupeeString()}.\n" +
+                            "Your share: ${plan.mySharePaise.toRupeeString()}",
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = chosen.isNotEmpty(),
+                onClick = { onSplit(chosen.toList()) },
+            ) { Text("Split") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

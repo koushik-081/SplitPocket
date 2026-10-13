@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.budgetapptracker.BudgetApp
 import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.data.EnvelopeSummary
+import com.example.budgetapptracker.data.PersonBalance
 import com.example.budgetapptracker.data.TransactionRow
 import com.example.budgetapptracker.sms.SmsImporter
 import java.time.YearMonth
@@ -40,6 +41,11 @@ class TransactionsViewModel(
         repository.observeEnvelopes(month)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // Everyone on the People tab, to choose who shared an expense.
+    val people: StateFlow<List<PersonBalance>> =
+        repository.observePeople()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val transactions: StateFlow<List<TransactionRow>> =
         selectedFilter
@@ -70,6 +76,19 @@ class TransactionsViewModel(
     fun assign(transaction: TransactionRow, categoryId: String, rememberPayee: Boolean) {
         viewModelScope.launch {
             repository.assignCategory(transaction.id, transaction.merchant, categoryId, rememberPayee)
+        }
+    }
+
+    fun split(transaction: TransactionRow, personIds: List<String>) {
+        viewModelScope.launch {
+            repository.splitExpense(
+                transactionId = transaction.id,
+                merchant = transaction.merchant,
+                totalPaise = transaction.amountPaise,
+                sharedWithIds = personIds,
+            )
+            _message.value = "Split with ${personIds.size} " +
+                if (personIds.size == 1) "person" else "people"
         }
     }
 
