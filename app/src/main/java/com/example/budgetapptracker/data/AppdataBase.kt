@@ -17,7 +17,7 @@ import com.example.budgetapptracker.backup.BackupDao
         DebtEntity::class,
         GroupMemberEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -112,6 +112,12 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_group_members_personId` " +
                             "ON `group_members` (`personId`)"
                 )
+            }
+        }
+        // Debts remember which expense they were split from, so a split can be undone.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `debts` ADD COLUMN `expenseId` TEXT")
             }
         }
     }

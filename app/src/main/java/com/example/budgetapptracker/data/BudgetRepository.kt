@@ -232,26 +232,31 @@ class BudgetRepository(private val dao: BudgetDao) {
         }
         dao.insertSplit(expense, debts)
     }
-    // Splits an expense you have already paid, equally between you and the chosen people.
-    // The expense shrinks to your share; each of the others now owes you theirs.
+    // Splits an expense you have already paid. shares says how much each person owes you;
+    // whatever is left of the total is your own share, and the expense shrinks to that.
     suspend fun splitExpense(
         transactionId: String,
         merchant: String,
         totalPaise: Long,
-        sharedWithIds: List<String>,
+        shares: Map<String, Long>,
     ) {
-        if (sharedWithIds.isEmpty()) return
-        val plan = planEqualSplit(totalPaise, otherPeople = sharedWithIds.size)
-        val debts = sharedWithIds.map {
-            DebtEntity(personId = it, amountPaise = plan.otherSharePaise, note = merchant)
+        val othersPaise = shares.values.sum()
+        if (shares.isEmpty() || shares.values.any { it <= 0 } || othersPaise > totalPaise) return
+        val debts = shares.map { (personId, paise) ->
+            DebtEntity(personId = personId, amountPaise = paise, note = merchant, expenseId = transactionId)
         }
         dao.splitExisting(
             id = transactionId,
-            sharePaise = plan.mySharePaise,
+            sharePaise = totalPaise - othersPaise,
             totalPaise = totalPaise,
-            note = "Your share of a ${sharedWithIds.size + 1}-way split",
+            note = "Your share of a split with ${shares.size} " +
+                if (shares.size == 1) "person" else "people",
             debts = debts,
         )
+    }
+
+    suspend fun undoSplit(transactionId: String) {
+        dao.undoSplit(transactionId)
     }
 
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {

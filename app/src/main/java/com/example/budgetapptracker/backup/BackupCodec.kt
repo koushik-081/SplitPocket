@@ -60,6 +60,7 @@ object BackupCodec {
             JSONObject().put("id", it.id).put("personId", it.personId)
                 .putOpt("groupId", it.groupId).put("amountPaise", it.amountPaise)
                 .put("note", it.note).put("createdAt", it.createdAt)
+                .putOpt("expenseId", it.expenseId)
         })
         .put("groupMembers", data.groupMembers.toArray {
             JSONObject().put("groupId", it.groupId).put("personId", it.personId)
@@ -122,6 +123,7 @@ object BackupCodec {
                     amountPaise = it.getLong("amountPaise"),
                     note = it.optString("note"),
                     createdAt = it.getLong("createdAt"),
+                    expenseId = it.textOrNull("expenseId"),
                 )
             },
             groupMembers = root.list("groupMembers") {

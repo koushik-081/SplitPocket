@@ -101,6 +101,8 @@ data class DebtEntity(
     val amountPaise: Long,
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+    // The expense this debt came from, when it was made by splitting one in Activity.
+    val expenseId: String? = null,
 )
 // Which people belong to which group.
 @Entity(

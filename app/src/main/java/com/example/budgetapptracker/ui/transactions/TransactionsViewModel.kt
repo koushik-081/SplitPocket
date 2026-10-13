@@ -79,16 +79,24 @@ class TransactionsViewModel(
         }
     }
 
-    fun split(transaction: TransactionRow, personIds: List<String>) {
+    // shares: what each chosen person owes you, in paise.
+    fun split(transaction: TransactionRow, shares: Map<String, Long>) {
         viewModelScope.launch {
             repository.splitExpense(
                 transactionId = transaction.id,
                 merchant = transaction.merchant,
                 totalPaise = transaction.amountPaise,
-                sharedWithIds = personIds,
+                shares = shares,
             )
-            _message.value = "Split with ${personIds.size} " +
-                if (personIds.size == 1) "person" else "people"
+            _message.value = "Split with ${shares.size} " +
+                if (shares.size == 1) "person" else "people"
+        }
+    }
+
+    fun undoSplit(transaction: TransactionRow) {
+        viewModelScope.launch {
+            repository.undoSplit(transaction.id)
+            _message.value = "Split undone"
         }
     }
 

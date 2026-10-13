@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -52,13 +54,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.PersonBalance
-import com.example.budgetapptracker.data.planEqualSplit
+import com.example.budgetapptracker.data.SplitMode
+import com.example.budgetapptracker.data.planShares
 import com.example.budgetapptracker.data.TransactionRow
 import com.example.budgetapptracker.ui.theme.transparentTopBarColors
 import com.example.budgetapptracker.util.toRupeeString
@@ -279,6 +283,10 @@ viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Fac
                     splitTransaction = target
                     openTransaction = null
                 },
+                onUndoSplit = {
+                    viewModel.undoSplit(target)
+                    openTransaction = null
+                },
             )
         }
     }
@@ -288,8 +296,8 @@ viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Fac
             transaction = target,
             people = people,
             onDismiss = { splitTransaction = null },
-            onSplit = { personIds ->
-                viewModel.split(target, personIds)
+            onSplit = { shares ->
+                viewModel.split(target, shares)
                 splitTransaction = null
             },
         )
@@ -304,6 +312,7 @@ private fun AssignDialog(
     onAssign: (String, Boolean) -> Unit,
     onRemove: () -> Unit,
     onSplit: () -> Unit,
+    onUndoSplit: () -> Unit,
 ) {
     val canRemember = transaction.merchant != UNKNOWN_MERCHANT
     var selectedId by remember { mutableStateOf(transaction.categoryId) }
@@ -364,6 +373,10 @@ private fun AssignDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    // Only splits made here can be undone; a group bill is edited in its group.
+                    if (transaction.splitCount > 0) {
+                        TextButton(onClick = onUndoSplit) { Text("Undo split") }
+                    }
                 }
 
                 TextButton(onClick = onRemove) {
@@ -384,16 +397,21 @@ private fun AssignDialog(
     )
 }
 
-// Choose who shared an expense you have already paid. It is divided equally.
+// Choose who shared an expense you have already paid, and how it is divided.
 @Composable
 private fun SplitDialog(
     transaction: TransactionRow,
     people: List<PersonBalance>,
     onDismiss: () -> Unit,
-    onSplit: (List<String>) -> Unit,
+    onSplit: (Map<String, Long>) -> Unit,
 ) {
+    var mode by remember { mutableStateOf(SplitMode.Equal) }
     var chosen by remember { mutableStateOf(emptySet<String>()) }
-    val plan = planEqualSplit(transaction.amountPaise, otherPeople = chosen.size)
+    // What is typed next to each person: rupees or a percentage, depending on the mode.
+    var entries by remember { mutableStateOf(emptyMap<String, String>()) }
+
+    val chosenIds = people.map { it.id }.filter { it in chosen }
+    val shares = planShares(transaction.amountPaise, mode, chosenIds, entries)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -406,26 +424,61 @@ private fun SplitDialog(
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
 
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SplitMode.entries.forEach { option ->
+                        FilterChip(
+                            selected = mode == option,
+                            onClick = {
+                                mode = option
+                                entries = emptyMap()
+                            },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+
                 if (people.isEmpty()) {
                     Text("Add people on the People tab first.")
                 }
                 people.forEach { person ->
+                    val isChosen = person.id in chosen
                     val toggle = {
-                        chosen = if (person.id in chosen) chosen - person.id else chosen + person.id
+                        chosen = if (isChosen) chosen - person.id else chosen + person.id
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { toggle() },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Checkbox(checked = person.id in chosen, onCheckedChange = { toggle() })
-                        Text(person.name)
+                        Checkbox(checked = isChosen, onCheckedChange = { toggle() })
+                        Text(person.name, modifier = Modifier.weight(1f))
+                        if (isChosen && mode != SplitMode.Equal) {
+                            OutlinedTextField(
+                                value = entries[person.id].orEmpty(),
+                                onValueChange = { typed ->
+                                    entries = entries + (person.id to typed.take(9))
+                                },
+                                prefix = if (mode == SplitMode.Amount) ({ Text("₹") }) else null,
+                                suffix = if (mode == SplitMode.Percent) ({ Text("%") }) else null,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.width(120.dp).padding(vertical = 4.dp),
+                            )
+                        }
                     }
                 }
 
-                if (chosen.isNotEmpty()) {
+                if (chosenIds.isNotEmpty()) {
                     Text(
-                        text = "Each of them owes you ${plan.otherSharePaise.toRupeeString()}.\n" +
-                            "Your share: ${plan.mySharePaise.toRupeeString()}",
+                        text = when {
+                            shares == null && mode == SplitMode.Equal -> "This amount is too small to split."
+                            shares == null -> "Enter each person's share. Together they cannot be more than the bill."
+                            mode == SplitMode.Equal ->
+                                "Each of them owes you ${shares.values.first().toRupeeString()}.\n" +
+                                    "Your share: ${(transaction.amountPaise - shares.values.sum()).toRupeeString()}"
+                            else ->
+                                "They owe you ${shares.values.sum().toRupeeString()} in total.\n" +
+                                    "Your share: ${(transaction.amountPaise - shares.values.sum()).toRupeeString()}"
+                        },
                         modifier = Modifier.padding(top = 12.dp),
                     )
                 }
@@ -433,8 +486,8 @@ private fun SplitDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = chosen.isNotEmpty(),
-                onClick = { onSplit(chosen.toList()) },
+                enabled = shares != null,
+                onClick = { shares?.let(onSplit) },
             ) { Text("Split") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

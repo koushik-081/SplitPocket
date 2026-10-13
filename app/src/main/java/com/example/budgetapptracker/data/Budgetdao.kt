@@ -28,6 +28,8 @@ data class TransactionRow(
     val remembered: Boolean,
     // The full amount paid, when this expense has been split and amountPaise is only your share.
     val paidPaise: Long?,
+    // How many people owe you for this expense. Above zero means the split can be undone.
+    val splitCount: Int,
 )
 
 data class PersonBalance(
@@ -213,6 +215,24 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     ) {
         if (shrinkToShare(id, sharePaise, totalPaise, note) == 1) insertDebts(debts)
     }
+
+    // Puts a split expense back to the full amount that was paid.
+    @Query(
+        """
+        UPDATE transactions SET amountPaise = paidPaise, paidPaise = NULL, note = ''
+        WHERE id = :id AND paidPaise IS NOT NULL
+        """
+    )
+    suspend fun restoreFullAmount(id: String): Int
+
+    @Query("DELETE FROM debts WHERE expenseId = :id")
+    suspend fun deleteSplitDebts(id: String)
+
+    // Undoes a split in one step: the expense is whole again and nobody owes for it.
+    @Transaction
+    suspend fun undoSplit(id: String) {
+        if (restoreFullAmount(id) == 1) deleteSplitDebts(id)
+    }
     @Query("SELECT COUNT(*) FROM transactions WHERE smsKey = :smsKey")
     suspend fun countSmsKey(smsKey: String): Int
 
@@ -285,7 +305,9 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
         """
         SELECT t.id, t.amountPaise, t.merchant, t.occurredAt, t.source, t.categoryId,
                c.name AS categoryName,
-               EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered,t.paidPaise
+               EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered,
+               t.paidPaise,
+               (SELECT COUNT(*) FROM debts d WHERE d.expenseId = t.id) AS splitCount
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.categoryId
         WHERE t.occurredAt >= :from AND t.occurredAt < :until
