@@ -41,6 +41,8 @@ data class TransactionEntity(
     val source: String = "MANUAL",
     val smsKey: String? = null,
     @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
+    // What actually left your account, when that differs from your own share (a split bill).
+    val paidPaise: Long? = null,
 )
 
 @Entity(tableName = "incomes")
@@ -99,4 +101,28 @@ data class DebtEntity(
     val amountPaise: Long,
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+)
+// Which people belong to which group.
+@Entity(
+    tableName = "group_members",
+    primaryKeys = ["groupId", "personId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = GroupEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["groupId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = PersonEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["personId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("personId")],
+)
+data class GroupMemberEntity(
+    val groupId: String,
+    val personId: String,
 )

@@ -6,6 +6,7 @@ import androidx.room.Query
 import com.example.budgetapptracker.data.CategoryEntity
 import com.example.budgetapptracker.data.DebtEntity
 import com.example.budgetapptracker.data.GroupEntity
+import com.example.budgetapptracker.data.GroupMemberEntity
 import com.example.budgetapptracker.data.IncomeEntity
 import com.example.budgetapptracker.data.MerchantRuleEntity
 import com.example.budgetapptracker.data.PersonEntity
@@ -21,6 +22,7 @@ interface BackupDao {
     @Query("SELECT * FROM people") suspend fun people(): List<PersonEntity>
     @Query("SELECT * FROM split_groups") suspend fun groups(): List<GroupEntity>
     @Query("SELECT * FROM debts") suspend fun debts(): List<DebtEntity>
+    @Query("SELECT * FROM group_members") suspend fun groupMembers(): List<GroupMemberEntity>
 
     @Insert suspend fun insertCategories(items: List<CategoryEntity>)
     @Insert suspend fun insertTransactions(items: List<TransactionEntity>)
@@ -29,6 +31,7 @@ interface BackupDao {
     @Insert suspend fun insertPeople(items: List<PersonEntity>)
     @Insert suspend fun insertGroups(items: List<GroupEntity>)
     @Insert suspend fun insertDebts(items: List<DebtEntity>)
+    @Insert suspend fun insertGroupMembers(items: List<GroupMemberEntity>)
 
     @Query("DELETE FROM categories") suspend fun clearCategories()
     @Query("DELETE FROM transactions") suspend fun clearTransactions()
@@ -37,4 +40,5 @@ interface BackupDao {
     @Query("DELETE FROM people") suspend fun clearPeople()
     @Query("DELETE FROM split_groups") suspend fun clearGroups()
     @Query("DELETE FROM debts") suspend fun clearDebts()
+    @Query("DELETE FROM group_members") suspend fun clearGroupMembers()
 }

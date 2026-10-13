@@ -68,23 +68,24 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
+import com.example.budgetapptracker.data.GroupSummary
 
 // Money owed to you is shown in green, money you owe in the theme's error colour.
-private val OwedToYou = Color(0xFF2FBF8F)
+internal val OwedToYou = Color(0xFF2FBF8F)
 
 private val entryDateFormat = DateTimeFormatter.ofPattern("d MMM, h:mm a")
 
-private fun Long.toEntryDate(): String =
+internal fun Long.toEntryDate(): String =
     Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).format(entryDateFormat)
 
-private fun balanceText(balancePaise: Long): String = when {
+internal fun balanceText(balancePaise: Long): String = when {
     balancePaise > 0 -> "owes you ${balancePaise.toRupeeString()}"
     balancePaise < 0 -> "you owe ${abs(balancePaise).toRupeeString()}"
     else -> "settled up"
 }
 
 @Composable
-private fun balanceColor(balancePaise: Long): Color = when {
+internal fun balanceColor(balancePaise: Long): Color = when {
     balancePaise > 0 -> OwedToYou
     balancePaise < 0 -> MaterialTheme.colorScheme.error
     else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -95,8 +96,14 @@ fun PeopleScreen(viewModel: PeopleViewModel = viewModel(factory = PeopleViewMode
     val people by viewModel.people.collectAsStateWithLifecycle()
     val openPerson by viewModel.openPerson.collectAsStateWithLifecycle()
     val entries by viewModel.openPersonEntries.collectAsStateWithLifecycle()
+    val groups by viewModel.groups.collectAsStateWithLifecycle()
+    val openGroup by viewModel.openGroup.collectAsStateWithLifecycle()
+    val groupMembers by viewModel.openGroupMembers.collectAsStateWithLifecycle()
+    val groupEntries by viewModel.openGroupEntries.collectAsStateWithLifecycle()
+    val envelopes by viewModel.envelopes.collectAsStateWithLifecycle()
 
     val person = openPerson
+    val group = openGroup
     if (person != null) {
         PersonDetail(
             person = person,
@@ -107,11 +114,26 @@ fun PeopleScreen(viewModel: PeopleViewModel = viewModel(factory = PeopleViewMode
             onDeleteEntry = { viewModel.deleteEntry(it) },
             onDeletePerson = { viewModel.deletePerson(person.id) },
         )
+    } else if (group != null) {
+        GroupDetail(
+            group = group,
+            members = groupMembers,
+            entries = groupEntries,
+            envelopes = envelopes,
+            onBack = { viewModel.closeGroup() },
+            onAddSplit = { description, totalPaise, sharedWithIds, payerId, envelopeId ->
+                viewModel.addSplit(group.id, description, totalPaise, sharedWithIds, payerId, envelopeId)
+            },
+            onDelete = { viewModel.deleteGroup(group.id) },
+        )
     } else {
         PeopleList(
             people = people,
+            groups = groups,
             onOpen = { viewModel.openPerson(it.id) },
             onAdd = { name, phone -> viewModel.addPerson(name, phone) },
+            onOpenGroup = { viewModel.openGroup(it.id) },
+            onAddGroup = { name, memberIds -> viewModel.addGroup(name, memberIds) },
         )
     }
 }
@@ -120,10 +142,14 @@ fun PeopleScreen(viewModel: PeopleViewModel = viewModel(factory = PeopleViewMode
 @Composable
 private fun PeopleList(
     people: List<PersonBalance>,
+    groups: List<GroupSummary>,
     onOpen: (PersonBalance) -> Unit,
     onAdd: (String, String) -> Unit,
+    onOpenGroup: (GroupSummary) -> Unit,
+    onAddGroup: (String, List<String>) -> Unit,
 ) {
     var showAdd by rememberSaveable { mutableStateOf(false) }
+    var showNewGroup by rememberSaveable { mutableStateOf(false) }
     val owedToYou = people.filter { it.balancePaise > 0 }.sumOf { it.balancePaise }
     val youOwe = people.filter { it.balancePaise < 0 }.sumOf { -it.balancePaise }
 
@@ -157,6 +183,36 @@ private fun PeopleList(
                     )
                 }
             }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Groups", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { showNewGroup = true }) { Text("New group") }
+                }
+            }
+            if (groups.isEmpty()) {
+                item {
+                    Text(
+                        text = "Make a group for a trip or a shared flat, then split bills in it.",
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(groups, key = { "group-" + it.id }) { group ->
+                GroupCard(group = group, onOpen = { onOpenGroup(group) }, modifier = Modifier.animateItem())
+            }
+            item {
+                Text(
+                    text = "People",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                )
+            }
             items(people, key = { it.id }) { person ->
                 Card(
                     onClick = { onOpen(person) },
@@ -187,7 +243,16 @@ private fun PeopleList(
             }
         }
     }
-
+    if (showNewGroup) {
+        NewGroupDialog(
+            people = people,
+            onDismiss = { showNewGroup = false },
+            onCreate = { name, memberIds ->
+                onAddGroup(name, memberIds)
+                showNewGroup = false
+            },
+        )
+    }
     if (showAdd) {
         AddPersonDialog(
             onDismiss = { showAdd = false },
@@ -221,7 +286,7 @@ private fun TotalTile(label: String, amountPaise: Long, color: Color, modifier: 
 }
 
 @Composable
-private fun Avatar(name: String) {
+internal     fun Avatar(name: String) {
     val accents = LocalAppColors.current.accents
     val accent = accents[(name.lowercase().hashCode() and Int.MAX_VALUE) % accents.size]
     Box(

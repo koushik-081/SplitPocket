@@ -15,8 +15,9 @@ import com.example.budgetapptracker.backup.BackupDao
         PersonEntity::class,
         GroupEntity::class,
         DebtEntity::class,
+        GroupMemberEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -92,6 +93,25 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_debts_personId` ON `debts` (`personId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_debts_groupId` ON `debts` (`groupId`)")
+            }
+        }
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `paidPaise` INTEGER")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `group_members` (" +
+                            "`groupId` TEXT NOT NULL, " +
+                            "`personId` TEXT NOT NULL, " +
+                            "PRIMARY KEY(`groupId`, `personId`), " +
+                            "FOREIGN KEY(`groupId`) REFERENCES `split_groups`(`id`) " +
+                            "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                            "FOREIGN KEY(`personId`) REFERENCES `people`(`id`) " +
+                            "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_group_members_personId` " +
+                            "ON `group_members` (`personId`)"
+                )
             }
         }
     }

@@ -9,6 +9,7 @@ import com.example.budgetapptracker.data.PersonEntity
 import com.example.budgetapptracker.data.TransactionEntity
 import org.json.JSONArray
 import org.json.JSONObject
+import com.example.budgetapptracker.data.GroupMemberEntity
 
 // Everything the app stores, held in memory while a backup is written or read.
 data class BackupData(
@@ -19,6 +20,7 @@ data class BackupData(
     val people: List<PersonEntity>,
     val groups: List<GroupEntity>,
     val debts: List<DebtEntity>,
+    val groupMembers: List<GroupMemberEntity> = emptyList(),
 )
 
 // Turns the data into JSON text and back. JSON is plain text, so an old backup stays
@@ -38,6 +40,7 @@ object BackupCodec {
                 .putOpt("categoryId", it.categoryId).put("merchant", it.merchant)
                 .put("note", it.note).put("occurredAt", it.occurredAt).put("source", it.source)
                 .putOpt("smsKey", it.smsKey).put("excluded", it.excluded)
+                .putOpt("paidPaise", it.paidPaise)
         })
         .put("incomes", data.incomes.toArray {
             JSONObject().put("id", it.id).put("amountPaise", it.amountPaise)
@@ -57,6 +60,9 @@ object BackupCodec {
             JSONObject().put("id", it.id).put("personId", it.personId)
                 .putOpt("groupId", it.groupId).put("amountPaise", it.amountPaise)
                 .put("note", it.note).put("createdAt", it.createdAt)
+        })
+        .put("groupMembers", data.groupMembers.toArray {
+            JSONObject().put("groupId", it.groupId).put("personId", it.personId)
         })
         .toString()
 
@@ -83,6 +89,7 @@ object BackupCodec {
                     source = it.optString("source", "MANUAL"),
                     smsKey = it.textOrNull("smsKey"),
                     excluded = it.optBoolean("excluded", false),
+                    paidPaise = if (it.isNull("paidPaise")) null else it.getLong("paidPaise"),
                 )
             },
             incomes = root.list("incomes") {
@@ -116,6 +123,9 @@ object BackupCodec {
                     note = it.optString("note"),
                     createdAt = it.getLong("createdAt"),
                 )
+            },
+            groupMembers = root.list("groupMembers") {
+                GroupMemberEntity(groupId = it.getString("groupId"), personId = it.getString("personId"))
             },
         )
     }

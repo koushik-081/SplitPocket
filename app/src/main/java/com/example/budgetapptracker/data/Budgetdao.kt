@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import androidx.room.Transaction
 
 data class EnvelopeSummary(
     val id: String,
@@ -41,8 +42,76 @@ data class DebtRow(
     val createdAt: Long,
     val groupName: String?,
 )
+data class GroupSummary(
+    val id: String,
+    val name: String,
+    val memberCount: Int,
+    val balancePaise: Long,
+)
+
+data class GroupEntryRow(
+    val id: String,
+    val personName: String,
+    val amountPaise: Long,
+    val note: String,
+    val createdAt: Long,
+)
 @Dao
 interface BudgetDao {
+    @Insert
+    suspend fun insertGroup(group: GroupEntity)
+
+    @Insert
+    suspend fun insertGroupMembers(members: List<GroupMemberEntity>)
+
+    @Insert
+    suspend fun insertDebts(debts: List<DebtEntity>)
+
+    @Query("DELETE FROM split_groups WHERE id = :id")
+    suspend fun deleteGroup(id: String)
+
+    // Saves a split bill in one step: your share as an expense, and what the others owe.
+    @Transaction
+    suspend fun insertSplit(expense: TransactionEntity?, debts: List<DebtEntity>) {
+        if (expense != null) insertTransaction(expense)
+        insertDebts(debts)
+    }
+
+    @Query(
+        """
+        SELECT g.id, g.name,
+               (SELECT COUNT(*) FROM group_members m WHERE m.groupId = g.id) AS memberCount,
+               (SELECT COALESCE(SUM(d.amountPaise), 0) FROM debts d WHERE d.groupId = g.id) AS balancePaise
+        FROM split_groups g
+        ORDER BY g.createdAt DESC
+        """
+    )
+    fun observeGroups(): Flow<List<GroupSummary>>
+
+    // Each member with their balance inside this one group.
+    @Query(
+        """
+        SELECT p.id, p.name, p.phone, COALESCE(SUM(d.amountPaise), 0) AS balancePaise
+        FROM group_members m
+        JOIN people p ON p.id = m.personId
+        LEFT JOIN debts d ON d.personId = p.id AND d.groupId = m.groupId
+        WHERE m.groupId = :groupId
+        GROUP BY p.id
+        ORDER BY p.name COLLATE NOCASE
+        """
+    )
+    fun observeGroupMembers(groupId: String): Flow<List<PersonBalance>>
+
+    @Query(
+        """
+        SELECT d.id, p.name AS personName, d.amountPaise, d.note, d.createdAt
+        FROM debts d
+        JOIN people p ON p.id = d.personId
+        WHERE d.groupId = :groupId
+        ORDER BY d.createdAt DESC
+        """
+    )
+    fun observeGroupEntries(groupId: String): Flow<List<GroupEntryRow>>
 
 @Insert
 suspend fun insertPerson(person: PersonEntity)
@@ -127,7 +196,8 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     @Query(
         """
         SELECT id FROM transactions
-        WHERE smsKey IS NULL AND excluded = 0 AND amountPaise = :amountPaise
+        WHERE smsKey IS NULL AND excluded = 0
+          AND (amountPaise = :amountPaise OR paidPaise = :amountPaise)
           AND occurredAt >= :from AND occurredAt <= :until
         ORDER BY occurredAt DESC LIMIT 1
         """

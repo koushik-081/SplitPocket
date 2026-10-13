@@ -136,6 +136,61 @@ class BudgetRepository(private val dao: BudgetDao) {
     suspend fun deletePerson(id: String) {
         dao.deletePerson(id)
     }
+    fun observeGroups(): Flow<List<GroupSummary>> = dao.observeGroups()
+
+    fun observeGroupMembers(groupId: String): Flow<List<PersonBalance>> =
+        dao.observeGroupMembers(groupId)
+
+    fun observeGroupEntries(groupId: String): Flow<List<GroupEntryRow>> =
+        dao.observeGroupEntries(groupId)
+
+    suspend fun addGroup(name: String, memberIds: List<String>) {
+        val group = GroupEntity(name = name.trim())
+        dao.insertGroup(group)
+        dao.insertGroupMembers(memberIds.map { GroupMemberEntity(groupId = group.id, personId = it) })
+    }
+
+    suspend fun deleteGroup(id: String) {
+        dao.deleteGroup(id)
+    }
+
+    // Splits a bill equally between you and the chosen people.
+    // payerId is null when you paid; otherwise it is the person who paid.
+    // envelopeId is null when your share should not count against any envelope.
+    suspend fun addSplit(
+        groupId: String,
+        description: String,
+        totalPaise: Long,
+        sharedWithIds: List<String>,
+        payerId: String?,
+        envelopeId: String?,
+    ) {
+        val plan = planEqualSplit(totalPaise, otherPeople = sharedWithIds.size)
+        val what = description.trim()
+
+        val debts = if (payerId == null) {
+            // You paid: each of the others owes you their share.
+            sharedWithIds.map {
+                DebtEntity(personId = it, groupId = groupId, amountPaise = plan.otherSharePaise, note = what)
+            }
+        } else {
+            // Someone else paid: you owe them your share.
+            listOf(DebtEntity(personId = payerId, groupId = groupId, amountPaise = -plan.mySharePaise, note = what))
+        }
+
+        // Only your own share is your spending, so only that goes into the envelope.
+        val expense = envelopeId?.let {
+            TransactionEntity(
+                amountPaise = plan.mySharePaise,
+                categoryId = it,
+                merchant = what,
+                note = "Your share of a ${sharedWithIds.size + 1}-way split",
+                source = "SPLIT",
+                paidPaise = if (payerId == null) totalPaise else null,
+            )
+        }
+        dao.insertSplit(expense, debts)
+    }
 
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {
         val zone = ZoneId.systemDefault()

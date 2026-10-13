@@ -28,6 +28,7 @@ class BackupManager(private val context: Context, private val database: AppDatab
             people = dao.people(),
             groups = dao.groups(),
             debts = dao.debts(),
+            groupMembers = dao.groupMembers(),
         )
         val file = BackupCrypto.encrypt(BackupCodec.toJson(data).toByteArray(), password, hint)
         context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file) }
@@ -58,6 +59,7 @@ class BackupManager(private val context: Context, private val database: AppDatab
 
         // One transaction: either the whole backup goes in, or the current data is left untouched.
         database.withTransaction {
+            dao.clearGroupMembers()
             dao.clearDebts()
             dao.clearPeople()
             dao.clearGroups()
@@ -73,6 +75,7 @@ class BackupManager(private val context: Context, private val database: AppDatab
             dao.insertPeople(data.people)
             dao.insertGroups(data.groups)
             dao.insertDebts(data.debts)
+            dao.insertGroupMembers(data.groupMembers)
         }
         RestoreResult.Restored(data.transactions.size, data.categories.size, data.people.size)
     }
