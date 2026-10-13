@@ -19,7 +19,7 @@ class BackupManager(private val context: Context, private val database: AppDatab
     private val dao get() = database.backupDao()
 
     // Writes everything to the file the user picked. Returns how many expenses were saved.
-    suspend fun backUp(uri: Uri, password: String): Int = withContext(Dispatchers.IO) {
+    suspend fun backUp(uri: Uri, password: String, hint: String): Int = withContext(Dispatchers.IO) {
         val data = BackupData(
             categories = dao.categories(),
             transactions = dao.transactions(),
@@ -29,12 +29,19 @@ class BackupManager(private val context: Context, private val database: AppDatab
             groups = dao.groups(),
             debts = dao.debts(),
         )
-        val file = BackupCrypto.encrypt(BackupCodec.toJson(data).toByteArray(), password)
+        val file = BackupCrypto.encrypt(BackupCodec.toJson(data).toByteArray(), password, hint)
         context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file) }
             ?: error("Could not open the chosen file")
         data.transactions.size
     }
-
+    // Looks at a chosen file without unlocking it. Returns its password hint (possibly empty),
+    // or null if the file is not one of this app's backups.
+    suspend fun hintOf(uri: Uri): String? = withContext(Dispatchers.IO) {
+        val file = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        }.getOrNull() ?: return@withContext null
+        if (BackupCrypto.isBackup(file)) BackupCrypto.hintOf(file) else null
+    }
     // Replaces everything in the app with the contents of a backup file.
     suspend fun restore(uri: Uri, password: String): RestoreResult = withContext(Dispatchers.IO) {
         val file = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
