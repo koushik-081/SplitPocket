@@ -94,6 +94,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.example.budgetapptracker.ui.pay.PayFlow
 import com.example.budgetapptracker.ui.pay.PayStart
+import com.example.budgetapptracker.ui.backup.BackupSection
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
 
@@ -515,6 +516,7 @@ private fun SettingsDialog(
                         enabled = lockAvailable,
                     )
                 }
+                BackupSection()
             }
         },
         confirmButton = {

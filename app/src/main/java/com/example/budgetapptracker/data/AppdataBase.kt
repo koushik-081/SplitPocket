@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.budgetapptracker.backup.BackupDao
 
 @Database(
     entities = [
@@ -20,6 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
