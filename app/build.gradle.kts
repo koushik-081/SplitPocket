@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.budgetapptracker"
+        applicationId = "com.splitpocket.app"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

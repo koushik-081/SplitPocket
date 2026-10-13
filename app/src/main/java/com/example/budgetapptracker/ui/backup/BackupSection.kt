@@ -83,7 +83,7 @@ fun BackupSection() {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick = { createFile.launch("budget-backup-${LocalDate.now()}.bbk") },
+                onClick = { createFile.launch("splitpocket-backup-${LocalDate.now()}.bbk") },
                 modifier = Modifier.weight(1f),
             ) { Text("Back up") }
             OutlinedButton(
