@@ -60,8 +60,44 @@ data class GroupEntryRow(
     val note: String,
     val createdAt: Long,
 )
+// A payment seen once a month for at least two months: probably a bill.
+data class BillSuggestion(
+    val name: String,
+    val amountPaise: Long,
+    val dayOfMonth: Int,
+)
+
 @Dao
 interface BudgetDao {
+    @Insert
+    suspend fun insertBill(bill: BillEntity)
+
+    @Query("DELETE FROM bills WHERE id = :id")
+    suspend fun deleteBill(id: String)
+
+    @Query("UPDATE bills SET paidMonth = :paidMonth WHERE id = :id")
+    suspend fun setBillPaidMonth(id: String, paidMonth: String?)
+
+    @Query("SELECT * FROM bills ORDER BY dayOfMonth")
+    fun observeBills(): Flow<List<BillEntity>>
+
+    // Payees paid exactly once in each of two or more months, for about the same amount.
+    @Query(
+        """
+        SELECT merchant AS name,
+               CAST(AVG(amountPaise) AS INTEGER) AS amountPaise,
+               CAST(strftime('%d', MAX(occurredAt) / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfMonth
+        FROM transactions
+        WHERE excluded = 0 AND occurredAt >= :since AND UPPER(merchant) != 'UNKNOWN'
+        GROUP BY UPPER(merchant)
+        HAVING COUNT(DISTINCT strftime('%Y-%m', occurredAt / 1000, 'unixepoch', 'localtime')) >= 2
+           AND COUNT(*) = COUNT(DISTINCT strftime('%Y-%m', occurredAt / 1000, 'unixepoch', 'localtime'))
+           AND MAX(amountPaise) * 10 <= MIN(amountPaise) * 12
+        ORDER BY amountPaise DESC
+        LIMIT 6
+        """
+    )
+    fun observeBillSuggestions(since: Long): Flow<List<BillSuggestion>>
     @Insert
     suspend fun insertGroup(group: GroupEntity)
 

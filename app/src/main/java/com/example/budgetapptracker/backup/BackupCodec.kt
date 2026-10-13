@@ -1,5 +1,6 @@
 package com.example.budgetapptracker.backup
 
+import com.example.budgetapptracker.data.BillEntity
 import com.example.budgetapptracker.data.CategoryEntity
 import com.example.budgetapptracker.data.DebtEntity
 import com.example.budgetapptracker.data.GroupEntity
@@ -21,6 +22,7 @@ data class BackupData(
     val groups: List<GroupEntity>,
     val debts: List<DebtEntity>,
     val groupMembers: List<GroupMemberEntity> = emptyList(),
+    val bills: List<BillEntity> = emptyList(),
 )
 
 // Turns the data into JSON text and back. JSON is plain text, so an old backup stays
@@ -64,6 +66,11 @@ object BackupCodec {
         })
         .put("groupMembers", data.groupMembers.toArray {
             JSONObject().put("groupId", it.groupId).put("personId", it.personId)
+        })
+        .put("bills", data.bills.toArray {
+            JSONObject().put("id", it.id).put("name", it.name)
+                .put("amountPaise", it.amountPaise).put("dayOfMonth", it.dayOfMonth)
+                .putOpt("paidMonth", it.paidMonth).put("createdAt", it.createdAt)
         })
         .toString()
 
@@ -128,6 +135,16 @@ object BackupCodec {
             },
             groupMembers = root.list("groupMembers") {
                 GroupMemberEntity(groupId = it.getString("groupId"), personId = it.getString("personId"))
+            },
+            bills = root.list("bills") {
+                BillEntity(
+                    id = it.getString("id"),
+                    name = it.getString("name"),
+                    amountPaise = it.getLong("amountPaise"),
+                    dayOfMonth = it.getInt("dayOfMonth"),
+                    paidMonth = it.textOrNull("paidMonth"),
+                    createdAt = it.getLong("createdAt"),
+                )
             },
         )
     }

@@ -11,6 +11,7 @@ import com.example.budgetapptracker.data.IncomeEntity
 import com.example.budgetapptracker.data.MerchantRuleEntity
 import com.example.budgetapptracker.data.PersonEntity
 import com.example.budgetapptracker.data.TransactionEntity
+import com.example.budgetapptracker.data.BillEntity
 
 // Reads and writes whole tables. Only the backup feature uses these.
 @Dao
@@ -23,8 +24,9 @@ interface BackupDao {
     @Query("SELECT * FROM split_groups") suspend fun groups(): List<GroupEntity>
     @Query("SELECT * FROM debts") suspend fun debts(): List<DebtEntity>
     @Query("SELECT * FROM group_members") suspend fun groupMembers(): List<GroupMemberEntity>
-
+    @Query("SELECT * FROM bills") suspend fun bills(): List<BillEntity>
     @Insert suspend fun insertCategories(items: List<CategoryEntity>)
+    @Insert suspend fun insertBills(items: List<BillEntity>)
     @Insert suspend fun insertTransactions(items: List<TransactionEntity>)
     @Insert suspend fun insertIncomes(items: List<IncomeEntity>)
     @Insert suspend fun insertRules(items: List<MerchantRuleEntity>)
@@ -34,6 +36,7 @@ interface BackupDao {
     @Insert suspend fun insertGroupMembers(items: List<GroupMemberEntity>)
 
     @Query("DELETE FROM categories") suspend fun clearCategories()
+    @Query("DELETE FROM bills") suspend fun clearBills()
     @Query("DELETE FROM transactions") suspend fun clearTransactions()
     @Query("DELETE FROM incomes") suspend fun clearIncomes()
     @Query("DELETE FROM merchant_rules") suspend fun clearRules()

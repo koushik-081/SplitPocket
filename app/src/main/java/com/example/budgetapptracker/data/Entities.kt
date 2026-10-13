@@ -128,3 +128,14 @@ data class GroupMemberEntity(
     val groupId: String,
     val personId: String,
 )
+// A payment that comes round every month: rent, an EMI, a subscription.
+@Entity(tableName = "bills")
+data class BillEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val amountPaise: Long,
+    val dayOfMonth: Int,
+    // The month it was last ticked off by hand, written like "2026-10".
+    val paidMonth: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)

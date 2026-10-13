@@ -12,6 +12,7 @@ private const val SAME_PAYMENT_BEFORE_MILLIS = 3 * 60 * 1_000L
 private const val SAME_PAYMENT_AFTER_MILLIS = 60 * 1_000L
 // How long ago a captured expense can be and still be the payment just made through the app.
 private const val JUST_PAID_MILLIS = 10 * 60 * 1_000L
+private const val BILL_LOOK_BACK_MILLIS = 125L * 24 * 60 * 60 * 1_000
 class BudgetRepository(private val dao: BudgetDao) {
 
     fun observeEnvelopes(month: YearMonth): Flow<List<EnvelopeSummary>> {
@@ -258,7 +259,24 @@ class BudgetRepository(private val dao: BudgetDao) {
     suspend fun undoSplit(transactionId: String) {
         dao.undoSplit(transactionId)
     }
+    fun observeBills(): Flow<List<BillEntity>> = dao.observeBills()
 
+    // Looks back about four months for payments that repeat monthly.
+    fun observeBillSuggestions(): Flow<List<BillSuggestion>> =
+        dao.observeBillSuggestions(System.currentTimeMillis() - BILL_LOOK_BACK_MILLIS)
+
+    suspend fun addBill(name: String, amountPaise: Long, dayOfMonth: Int) {
+        dao.insertBill(BillEntity(name = name.trim(), amountPaise = amountPaise, dayOfMonth = dayOfMonth))
+    }
+
+    // paidMonth is written like "2026-10", or null to clear the tick.
+    suspend fun setBillPaid(id: String, paidMonth: String?) {
+        dao.setBillPaidMonth(id, paidMonth)
+    }
+
+    suspend fun deleteBill(id: String) {
+        dao.deleteBill(id)
+    }
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {
         val zone = ZoneId.systemDefault()
         val from = atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()

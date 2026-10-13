@@ -16,8 +16,9 @@ import com.example.budgetapptracker.backup.BackupDao
         GroupEntity::class,
         DebtEntity::class,
         GroupMemberEntity::class,
+        BillEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -118,6 +119,21 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `debts` ADD COLUMN `expenseId` TEXT")
+            }
+        }
+        // Monthly bills: rent, EMIs and subscriptions.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `bills` (" +
+                            "`id` TEXT NOT NULL, " +
+                            "`name` TEXT NOT NULL, " +
+                            "`amountPaise` INTEGER NOT NULL, " +
+                            "`dayOfMonth` INTEGER NOT NULL, " +
+                            "`paidMonth` TEXT, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`id`))"
+                )
             }
         }
     }

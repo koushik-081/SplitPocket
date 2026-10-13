@@ -95,6 +95,7 @@ import java.util.Locale
 import com.example.budgetapptracker.ui.pay.PayFlow
 import com.example.budgetapptracker.ui.pay.PayStart
 import com.example.budgetapptracker.ui.backup.BackupSection
+import com.example.budgetapptracker.ui.bills.BillsCard
 import com.example.budgetapptracker.ui.capture.PaymentCaptureSection
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
@@ -375,6 +376,7 @@ private fun DashboardScreen(
             if (lastSevenDays.isNotEmpty()) {
                 item { WeekCard(days = lastSevenDays) }
             }
+            item { BillsCard() }
             item {
                 Text(
                     text = "Envelopes",
