@@ -13,6 +13,8 @@ private const val SAME_PAYMENT_BEFORE_MILLIS = 3 * 60 * 1_000L
 private const val SAME_PAYMENT_AFTER_MILLIS = 60 * 1_000L
 // How long ago a captured expense can be and still be the payment just made through the app.
 private const val JUST_PAID_MILLIS = 10 * 60 * 1_000L
+// How long ago a captured payment can be and still be the one that paid back a debt.
+private const val SETTLE_LOOK_BACK_MILLIS = 24 * 60 * 60 * 1_000L
 private const val BILL_LOOK_BACK_MILLIS = 125L * 24 * 60 * 60 * 1_000
 class BudgetRepository(private val dao: BudgetDao) {
 
@@ -175,7 +177,38 @@ class BudgetRepository(private val dao: BudgetDao) {
     suspend fun deleteDebt(id: String) {
         dao.deleteDebt(id)
     }
-
+    // Brings a person's balance to zero. When you owed them, envelopeId is the envelope the
+    // money came out of, or null when it is already counted (your share of a group bill).
+    suspend fun settleUp(personId: String, personName: String, balancePaise: Long, envelopeId: String?) {
+        val settled = DebtEntity(personId = personId, amountPaise = -balancePaise, note = "Settled up")
+        if (balancePaise >= 0 || envelopeId == null) {
+            dao.insertDebt(settled)
+            return
+        }
+        val paidPaise = -balancePaise
+        // Paid through GPay or similar: the bank SMS or the app's notification may have
+        // recorded it already. Put that one in the envelope instead of adding a twin.
+        val captured = dao.findCapturedWithoutEnvelope(
+            amountPaise = paidPaise,
+            from = System.currentTimeMillis() - SETTLE_LOOK_BACK_MILLIS,
+        )
+        if (captured != null) {
+            dao.setTransactionCategory(captured, envelopeId)
+            dao.insertDebt(settled)
+            return
+        }
+        // Saves the expense and the ledger line together.
+        dao.insertSplit(
+            TransactionEntity(
+                amountPaise = paidPaise,
+                categoryId = envelopeId,
+                merchant = "Paid $personName",
+                note = "Settled up",
+                source = "SETTLE",
+            ),
+            listOf(settled),
+        )
+    }
     suspend fun deletePerson(id: String) {
         dao.deletePerson(id)
     }

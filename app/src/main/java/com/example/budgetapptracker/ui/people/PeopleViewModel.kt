@@ -91,8 +91,11 @@ class PeopleViewModel(private val repository: BudgetRepository) : ViewModel() {
         viewModelScope.launch { repository.addDebt(personId, signedPaise, note) }
     }
 
-    fun settleUp(person: PersonBalance) {
-        viewModelScope.launch { repository.addDebt(person.id, -person.balancePaise, "Settled up") }
+    // envelopeId: where the money came from when you paid them; null when it is already counted.
+    fun settleUp(person: PersonBalance, envelopeId: String?) {
+        viewModelScope.launch {
+            repository.settleUp(person.id, person.name, person.balancePaise, envelopeId)
+        }
     }
 
     fun deleteEntry(id: String) {

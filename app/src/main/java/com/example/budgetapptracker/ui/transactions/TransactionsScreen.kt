@@ -365,7 +365,7 @@ private fun AssignDialog(
                 }
 
                 val paidPaise = transaction.paidPaise
-                if (paidPaise == null && transaction.source != "SPLIT") {
+                if (paidPaise == null && transaction.source != "SPLIT" && transaction.source != "SETTLE") {
                     TextButton(onClick = onSplit) { Text("Split with people") }
                 } else if (paidPaise != null && paidPaise != transaction.amountPaise) {
                     Text(

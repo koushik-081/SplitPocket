@@ -69,6 +69,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import com.example.budgetapptracker.data.GroupSummary
+import androidx.compose.material3.FilterChip
+import com.example.budgetapptracker.data.EnvelopeSummary
 
 // Money owed to you is shown in green, money you owe in the theme's error colour.
 internal val OwedToYou = Color(0xFF2FBF8F)
@@ -108,9 +110,10 @@ fun PeopleScreen(viewModel: PeopleViewModel = viewModel(factory = PeopleViewMode
         PersonDetail(
             person = person,
             entries = entries,
+            envelopes = envelopes,
             onBack = { viewModel.closePerson() },
             onAddEntry = { signedPaise, note -> viewModel.addEntry(person.id, signedPaise, note) },
-            onSettle = { viewModel.settleUp(person) },
+            onSettle = { envelopeId -> viewModel.settleUp(person, envelopeId) },
             onDeleteEntry = { viewModel.deleteEntry(it) },
             onDeletePerson = { viewModel.deletePerson(person.id) },
         )
@@ -302,9 +305,10 @@ internal     fun Avatar(name: String) {
 private fun PersonDetail(
     person: PersonBalance,
     entries: List<DebtRow>,
+    envelopes: List<EnvelopeSummary>,
     onBack: () -> Unit,
     onAddEntry: (Long, String) -> Unit,
-    onSettle: () -> Unit,
+    onSettle: (envelopeId: String?) -> Unit,
     onDeleteEntry: (String) -> Unit,
     onDeletePerson: () -> Unit,
 ) {
@@ -313,6 +317,7 @@ private fun PersonDetail(
     var entrySign by remember { mutableStateOf<Int?>(null) }
     var pendingDelete by remember { mutableStateOf<DebtRow?>(null) }
     var confirmDeletePerson by remember { mutableStateOf(false) }
+    var settling by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onBack)
 
@@ -364,7 +369,11 @@ private fun PersonDetail(
                     }
                     if (person.balancePaise != 0L) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = onSettle, modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                // Paying them back is spending, so ask which envelope it came from.
+                                onClick = { if (person.balancePaise < 0) settling = true else onSettle(null) },
+                                modifier = Modifier.weight(1f),
+                            ) {
                                 Text("Settle up")
                             }
                             if (person.balancePaise > 0) {
@@ -431,6 +440,17 @@ private fun PersonDetail(
             },
         )
     }
+    if (settling) {
+        SettleDialog(
+            person = person,
+            envelopes = envelopes,
+            onDismiss = { settling = false },
+            onSettle = { envelopeId ->
+                onSettle(envelopeId)
+                settling = false
+            },
+        )
+    }
 
     pendingDelete?.let { entry ->
         AlertDialog(
@@ -463,6 +483,63 @@ private fun PersonDetail(
             },
         )
     }
+}
+// Shown when you pay someone back, so the money shows up as spending in an envelope.
+@Composable
+private fun SettleDialog(
+    person: PersonBalance,
+    envelopes: List<EnvelopeSummary>,
+    onDismiss: () -> Unit,
+    onSettle: (envelopeId: String?) -> Unit,
+) {
+    // Nothing is picked at first, so the choice is never made by accident.
+    var picked by rememberSaveable { mutableStateOf(false) }
+    var envelopeId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Paid ${person.name} ${abs(person.balancePaise).toRupeeString()}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Which envelope did this money come out of?")
+                ChipRow {
+                    envelopes.forEach { envelope ->
+                        FilterChip(
+                            selected = picked && envelopeId == envelope.id,
+                            onClick = {
+                                picked = true
+                                envelopeId = envelope.id
+                            },
+                            label = { Text(envelope.name) },
+                        )
+                    }
+                    FilterChip(
+                        selected = picked && envelopeId == null,
+                        onClick = {
+                            picked = true
+                            envelopeId = null
+                        },
+                        label = { Text("Don't count it") },
+                    )
+                }
+                Text(
+                    text = when {
+                        !picked -> "Pick \"Don't count it\" if your share is already in an envelope, " +
+                                "for example from a group bill."
+                        envelopeId == null -> "The balance is cleared, and no spending is added."
+                        else -> "It shows in Activity and Insights as spending. If your bank SMS or " +
+                                "payment app already caught this payment, that one is used."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = picked, onClick = { onSettle(envelopeId) }) { Text("Settle up") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -447,7 +447,7 @@ private fun SplitDialog(
 
 // A row of chips that scrolls sideways when there are too many to fit.
 @Composable
-private fun ChipRow(content: @Composable () -> Unit) {
+internal fun ChipRow(content: @Composable () -> Unit) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
