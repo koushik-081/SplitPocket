@@ -20,8 +20,6 @@ import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Insights
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -142,16 +140,14 @@ private fun BottomBar(
                         modifier = Modifier.size(30.dp),
                     )
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    HomeAction.entries.forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.label) },
-                            onClick = {
-                                menuOpen = false
-                                onAction(action)
-                            },
-                        )
-                    }
+                if (menuOpen) {
+                    AddSheet(
+                        onDismiss = { menuOpen = false },
+                        onPick = { action ->
+                            menuOpen = false
+                            onAction(action)
+                        },
+                    )
                 }
             }
             BarItem(
