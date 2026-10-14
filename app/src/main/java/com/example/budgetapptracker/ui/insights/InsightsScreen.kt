@@ -41,6 +41,7 @@ import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.example.budgetapptracker.ui.export.ExportPdfButton
 
 private val wholeRupees = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN"))
     .apply { maximumFractionDigits = 0 }
@@ -58,7 +59,14 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsVi
 
     Scaffold(
         containerColor = Color.Transparent,
-        topBar = { TopAppBar(colors = transparentTopBarColors(), title = { Text("Insights") }) },
+        topBar = {
+            TopAppBar(
+                colors = transparentTopBarColors(),
+                title = { Text("Insights") },
+                actions = { ExportPdfButton() },
+            )
+        },
+        
     ) { padding ->
         LazyColumn(
             modifier = Modifier
