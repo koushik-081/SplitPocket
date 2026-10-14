@@ -62,6 +62,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.play.services.code.scanner)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment)

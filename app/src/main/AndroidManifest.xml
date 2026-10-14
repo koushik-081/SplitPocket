@@ -54,6 +54,18 @@
         <receiver
             android:name=".notify.NotificationActionReceiver"
             android:exported="false" />
+        <!-- The home-screen widget showing what is left to spend. -->
+        <receiver
+            android:name=".widget.BudgetWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/budget_widget_info" />
+        </receiver>
         <!-- Lets a PDF viewer or gallery open one payslip file, read-only, when the user asks. -->
         <provider
             android:name="androidx.core.content.FileProvider"
