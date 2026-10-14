@@ -96,6 +96,7 @@ import com.example.budgetapptracker.ui.pay.PayFlow
 import com.example.budgetapptracker.ui.pay.PayStart
 import com.example.budgetapptracker.ui.backup.BackupSection
 import com.example.budgetapptracker.ui.bills.BillsCard
+import com.example.budgetapptracker.ui.recap.RecapCard
 import com.example.budgetapptracker.ui.payslips.PayslipsSheet
 import com.example.budgetapptracker.ui.capture.PaymentCaptureSection
 
@@ -365,6 +366,7 @@ private fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { Header(userName = userName, onOpenSettings = onOpenSettings) }
+            item { RecapCard() }
             item {
                 HeroCard(
                     incomePaise = incomePaise,
