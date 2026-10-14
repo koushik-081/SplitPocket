@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.example.budgetapptracker.data.AppDatabase
+import com.example.budgetapptracker.payslip.PayslipFiles
 import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,8 +31,13 @@ class BackupManager(private val context: Context, private val database: AppDatab
             debts = dao.debts(),
             groupMembers = dao.groupMembers(),
             bills = dao.bills(),
+            payslips = dao.payslips(),
         )
-        val file = BackupCrypto.encrypt(BackupCodec.toJson(data).toByteArray(), password, hint)
+        // The payslip files themselves travel inside the backup too.
+        val withFiles = data.copy(
+            payslipFiles = PayslipFiles.readAll(context, data.payslips.mapNotNull { it.fileName }),
+        )
+        val file = BackupCrypto.encrypt(BackupCodec.toJson(withFiles).toByteArray(), password, hint)
         context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file) }
             ?: error("Could not open the chosen file")
         data.transactions.size
@@ -61,6 +67,7 @@ class BackupManager(private val context: Context, private val database: AppDatab
         // One transaction: either the whole backup goes in, or the current data is left untouched.
         database.withTransaction {
             dao.clearBills()
+            dao.clearPayslips()
             dao.clearGroupMembers()
             dao.clearDebts()
             dao.clearPeople()
@@ -79,7 +86,9 @@ class BackupManager(private val context: Context, private val database: AppDatab
             dao.insertDebts(data.debts)
             dao.insertGroupMembers(data.groupMembers)
             dao.insertBills(data.bills)
+            dao.insertPayslips(data.payslips)
         }
+        PayslipFiles.replaceAll(context, data.payslipFiles)
         RestoreResult.Restored(data.transactions.size, data.categories.size, data.people.size)
     }
 }

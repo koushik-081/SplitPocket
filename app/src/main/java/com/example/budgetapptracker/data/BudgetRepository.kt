@@ -3,6 +3,7 @@ package com.example.budgetapptracker.data
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 // How far apart an expense and its bank SMS can be and still count as the same payment.
 private const val MATCH_BEFORE_MILLIS = 30 * 60 * 1_000L
@@ -277,6 +278,36 @@ class BudgetRepository(private val dao: BudgetDao) {
     suspend fun deleteBill(id: String) {
         dao.deleteBill(id)
     }
+    fun observePayslips(): Flow<List<PayslipEntity>> = dao.observePayslips()
+
+    // True when that month already has an income whose name mentions salary.
+    fun observeHasSalary(month: YearMonth): Flow<Boolean> {
+        val (from, until) = month.toEpochRange()
+        return dao.observeSalaryCount(from, until).map { it > 0 }
+    }
+
+    // Saves a payslip and, if asked, records its net pay as that month's income.
+    suspend fun addPayslip(payslip: PayslipEntity, addAsIncome: Boolean) {
+        dao.insertPayslip(payslip)
+        if (addAsIncome) {
+            val month = YearMonth.parse(payslip.month)
+            // This month: now. An earlier month: its first day, so it counts in that month.
+            val receivedAt = if (month == YearMonth.now()) System.currentTimeMillis()
+            else month.toEpochRange().first
+            dao.insertIncome(
+                IncomeEntity(
+                    amountPaise = payslip.netPaise,
+                    source = "Salary · ${payslip.employer}",
+                    receivedAt = receivedAt,
+                )
+            )
+        }
+    }
+
+    suspend fun deletePayslip(id: String) {
+        dao.deletePayslip(id)
+    }
+
     private fun YearMonth.toEpochRange(): Pair<Long, Long> {
         val zone = ZoneId.systemDefault()
         val from = atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()

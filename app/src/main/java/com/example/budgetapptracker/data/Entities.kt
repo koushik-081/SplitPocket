@@ -139,3 +139,19 @@ data class BillEntity(
     val paidMonth: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )
+
+// One month's salary details, with the payslip file kept in the app's private storage.
+@Entity(tableName = "payslips")
+data class PayslipEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    // The pay month, written like "2026-10".
+    val month: String,
+    val employer: String,
+    val grossPaise: Long,
+    val deductionsPaise: Long,
+    val netPaise: Long,
+    // The stored file's name and type (PDF or picture), when one is attached.
+    val fileName: String? = null,
+    val fileType: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)

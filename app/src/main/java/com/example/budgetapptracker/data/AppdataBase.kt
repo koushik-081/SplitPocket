@@ -17,8 +17,9 @@ import com.example.budgetapptracker.backup.BackupDao
         DebtEntity::class,
         GroupMemberEntity::class,
         BillEntity::class,
+        PayslipEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -131,6 +132,25 @@ abstract class AppDatabase : RoomDatabase() {
                             "`amountPaise` INTEGER NOT NULL, " +
                             "`dayOfMonth` INTEGER NOT NULL, " +
                             "`paidMonth` TEXT, " +
+                            "`createdAt` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
+        // Payslips: salary details per month and the attached file's name.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `payslips` (" +
+                            "`id` TEXT NOT NULL, " +
+                            "`month` TEXT NOT NULL, " +
+                            "`employer` TEXT NOT NULL, " +
+                            "`grossPaise` INTEGER NOT NULL, " +
+                            "`deductionsPaise` INTEGER NOT NULL, " +
+                            "`netPaise` INTEGER NOT NULL, " +
+                            "`fileName` TEXT, " +
+                            "`fileType` TEXT, " +
                             "`createdAt` INTEGER NOT NULL, " +
                             "PRIMARY KEY(`id`))"
                 )

@@ -66,7 +66,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsVi
                 actions = { ExportPdfButton() },
             )
         },
-        
+
     ) { padding ->
         LazyColumn(
             modifier = Modifier

@@ -54,6 +54,16 @@
         <receiver
             android:name=".notify.NotificationActionReceiver"
             android:exported="false" />
+        <!-- Lets a PDF viewer or gallery open one payslip file, read-only, when the user asks. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/payslip_paths" />
+        </provider>
         <!-- Reads "you paid" notifications from payment apps, once the user allows it in Settings. -->
         <service
             android:name=".notify.PaymentNotificationListener"

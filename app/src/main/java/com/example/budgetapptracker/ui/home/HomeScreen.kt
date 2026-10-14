@@ -96,6 +96,7 @@ import com.example.budgetapptracker.ui.pay.PayFlow
 import com.example.budgetapptracker.ui.pay.PayStart
 import com.example.budgetapptracker.ui.backup.BackupSection
 import com.example.budgetapptracker.ui.bills.BillsCard
+import com.example.budgetapptracker.ui.payslips.PayslipsSheet
 import com.example.budgetapptracker.ui.capture.PaymentCaptureSection
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
@@ -150,6 +151,7 @@ enum class HomeAction(val label: String) {
     AddExpense("Add expense"),
     AddIncome("Add income"),
     NewEnvelope("New envelope"),
+    Payslips("Payslips"),
 }
 
 @Composable
@@ -170,6 +172,7 @@ fun HomeScreen(
     var showAddIncome by rememberSaveable { mutableStateOf(false) }
     var showPickEnvelope by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showPayslips by rememberSaveable { mutableStateOf(false) }
     var payStart by remember { mutableStateOf<PayStart?>(null) }
     var expenseTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
     var budgetTarget by remember { mutableStateOf<EnvelopeSummary?>(null) }
@@ -181,6 +184,7 @@ fun HomeScreen(
             HomeAction.AddExpense -> showPickEnvelope = true
             HomeAction.AddIncome -> showAddIncome = true
             HomeAction.NewEnvelope -> showAddEnvelope = true
+            HomeAction.Payslips -> showPayslips = true
             null -> return@LaunchedEffect
         }
         onActionHandled()
@@ -231,6 +235,10 @@ fun HomeScreen(
         envelopes = envelopes,
         viewModel = viewModel,
     )
+
+    if (showPayslips) {
+        PayslipsSheet(onDismiss = { showPayslips = false })
+    }
 
     if (showSettings) {
         SettingsDialog(

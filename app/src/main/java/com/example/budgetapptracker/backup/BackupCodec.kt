@@ -1,6 +1,8 @@
 package com.example.budgetapptracker.backup
 
 import com.example.budgetapptracker.data.BillEntity
+import com.example.budgetapptracker.data.PayslipEntity
+import java.util.Base64
 import com.example.budgetapptracker.data.CategoryEntity
 import com.example.budgetapptracker.data.DebtEntity
 import com.example.budgetapptracker.data.GroupEntity
@@ -23,6 +25,9 @@ data class BackupData(
     val debts: List<DebtEntity>,
     val groupMembers: List<GroupMemberEntity> = emptyList(),
     val bills: List<BillEntity> = emptyList(),
+    val payslips: List<PayslipEntity> = emptyList(),
+    // Attached payslip files by file name, stored in the JSON as Base64 text.
+    val payslipFiles: Map<String, ByteArray> = emptyMap(),
 )
 
 // Turns the data into JSON text and back. JSON is plain text, so an old backup stays
@@ -71,6 +76,17 @@ object BackupCodec {
             JSONObject().put("id", it.id).put("name", it.name)
                 .put("amountPaise", it.amountPaise).put("dayOfMonth", it.dayOfMonth)
                 .putOpt("paidMonth", it.paidMonth).put("createdAt", it.createdAt)
+        })
+        .put("payslips", data.payslips.toArray {
+            JSONObject().put("id", it.id).put("month", it.month).put("employer", it.employer)
+                .put("grossPaise", it.grossPaise).put("deductionsPaise", it.deductionsPaise)
+                .put("netPaise", it.netPaise).putOpt("fileName", it.fileName)
+                .putOpt("fileType", it.fileType).put("createdAt", it.createdAt)
+        })
+        .put("payslipFiles", JSONObject().also { files ->
+            data.payslipFiles.forEach { (name, bytes) ->
+                files.put(name, Base64.getEncoder().encodeToString(bytes))
+            }
         })
         .toString()
 
@@ -146,6 +162,22 @@ object BackupCodec {
                     createdAt = it.getLong("createdAt"),
                 )
             },
+            payslips = root.list("payslips") {
+                PayslipEntity(
+                    id = it.getString("id"),
+                    month = it.getString("month"),
+                    employer = it.getString("employer"),
+                    grossPaise = it.getLong("grossPaise"),
+                    deductionsPaise = it.getLong("deductionsPaise"),
+                    netPaise = it.getLong("netPaise"),
+                    fileName = it.textOrNull("fileName"),
+                    fileType = it.textOrNull("fileType"),
+                    createdAt = it.getLong("createdAt"),
+                )
+            },
+            payslipFiles = root.optJSONObject("payslipFiles")?.let { files ->
+                files.keys().asSequence().associateWith { Base64.getDecoder().decode(files.getString(it)) }
+            } ?: emptyMap(),
         )
     }
 

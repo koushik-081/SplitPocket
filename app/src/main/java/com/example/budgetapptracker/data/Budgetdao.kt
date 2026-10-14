@@ -70,6 +70,24 @@ data class BillSuggestion(
 @Dao
 interface BudgetDao {
     @Insert
+    suspend fun insertPayslip(payslip: PayslipEntity)
+
+    @Query("DELETE FROM payslips WHERE id = :id")
+    suspend fun deletePayslip(id: String)
+
+    @Query("SELECT * FROM payslips ORDER BY month DESC, createdAt DESC")
+    fun observePayslips(): Flow<List<PayslipEntity>>
+
+    // How many incomes in this date range have "salary" in their name.
+    @Query(
+        """
+        SELECT COUNT(*) FROM incomes
+        WHERE receivedAt >= :from AND receivedAt < :until AND LOWER(source) LIKE '%salary%'
+        """
+    )
+    fun observeSalaryCount(from: Long, until: Long): Flow<Int>
+
+    @Insert
     suspend fun insertBill(bill: BillEntity)
 
     @Query("DELETE FROM bills WHERE id = :id")
