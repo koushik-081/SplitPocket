@@ -136,6 +136,11 @@ class HomeViewModel(
         viewModelScope.launch { repository.updateBudget(categoryId, budgetPaise) }
     }
 
+    fun deleteEnvelope(id: String) {
+        openEnvelopeId.value = null
+        viewModelScope.launch { repository.deleteCategory(id) }
+    }
+
     fun addIncome(source: String, amountPaise: Long) {
         viewModelScope.launch { repository.addIncome(source, amountPaise) }
     }

@@ -218,6 +218,7 @@ fun HomeScreen(
                 onAddExpense = { expenseTarget = detail },
                 onEditBudget = { budgetTarget = detail },
                 onRemove = { viewModel.removeTransaction(it) },
+                onDelete = { viewModel.deleteEnvelope(detail.id) },
             )
         } else {
             DashboardScreen(

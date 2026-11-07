@@ -49,6 +49,10 @@ class BudgetRepository(private val dao: BudgetDao) {
         dao.updateCategoryBudget(categoryId, budgetPaise)
     }
 
+    suspend fun deleteCategory(id: String) {
+        dao.deleteCategory(id)
+    }
+
     suspend fun addIncome(source: String, amountPaise: Long) {
         dao.insertIncome(IncomeEntity(amountPaise = amountPaise, source = source.trim()))
     }

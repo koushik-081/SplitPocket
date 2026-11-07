@@ -332,6 +332,24 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     @Query("UPDATE categories SET monthlyBudgetPaise = :budgetPaise WHERE id = :id")
     suspend fun updateCategoryBudget(id: String, budgetPaise: Long)
 
+    @Query("UPDATE transactions SET categoryId = NULL WHERE categoryId = :id")
+    suspend fun unfileExpenses(id: String)
+
+    @Query("DELETE FROM merchant_rules WHERE categoryId = :id")
+    suspend fun deleteRulesFor(id: String)
+
+    @Query("DELETE FROM categories WHERE id = :id")
+    suspend fun deleteCategoryRow(id: String)
+
+    // Deletes an envelope. Its expenses are kept and go back to the Inbox, unfiled,
+    // and payees remembered for it are forgotten.
+    @Transaction
+    suspend fun deleteCategory(id: String) {
+        unfileExpenses(id)
+        deleteRulesFor(id)
+        deleteCategoryRow(id)
+    }
+
     @Query(
         """
         SELECT COALESCE(SUM(amountPaise), 0) FROM incomes

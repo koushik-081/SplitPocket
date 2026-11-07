@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -56,8 +57,10 @@ fun EnvelopeDetailScreen(
     onAddExpense: () -> Unit,
     onEditBudget: () -> Unit,
     onRemove: (String) -> Unit,
+    onDelete: () -> Unit,
 ) {
     var pendingRemove by remember { mutableStateOf<TransactionRow?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val overspent = envelope.remainingPaise < 0
     val fraction = if (envelope.monthlyBudgetPaise == 0L) 0f
     else (envelope.spentPaise.toFloat() / envelope.monthlyBudgetPaise).coerceIn(0f, 1f)
@@ -77,6 +80,9 @@ fun EnvelopeDetailScreen(
                 },
                 actions = {
                     TextButton(onClick = onEditBudget) { Text("Edit budget") }
+                    IconButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Delete envelope")
+                    }
                 },
             )
         },
@@ -138,6 +144,26 @@ fun EnvelopeDetailScreen(
 
             item { Spacer(modifier = Modifier.height(72.dp)) }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete ${envelope.name}?") },
+            text = {
+                Text(
+                    "Its expenses are kept and move to the Inbox in Activity, where you can " +
+                            "put them in another envelope. This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
     }
 
     pendingRemove?.let { target ->
