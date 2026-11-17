@@ -9,6 +9,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.budgetapptracker.BudgetApp
 import com.example.budgetapptracker.data.PayslipEntity
 import com.example.budgetapptracker.payslip.PayslipFiles
+import com.example.budgetapptracker.payslip.PayslipRead
+import com.example.budgetapptracker.payslip.PayslipReader
 import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +38,8 @@ class PayslipsViewModel(private val app: BudgetApp) : ViewModel() {
         deductionsPaise: Long,
         attachment: Uri?,
         addAsIncome: Boolean,
+        pfPaise: Long? = null,
+        taxPaise: Long? = null,
     ) {
         viewModelScope.launch {
             var payslip = PayslipEntity(
@@ -44,6 +48,8 @@ class PayslipsViewModel(private val app: BudgetApp) : ViewModel() {
                 grossPaise = grossPaise,
                 deductionsPaise = deductionsPaise,
                 netPaise = grossPaise - deductionsPaise,
+                pfPaise = pfPaise,
+                taxPaise = taxPaise,
             )
             if (attachment != null) {
                 // Copying a file is slow work, so it runs off the main thread.
@@ -54,6 +60,9 @@ class PayslipsViewModel(private val app: BudgetApp) : ViewModel() {
             app.repository.addPayslip(payslip, addAsIncome)
         }
     }
+
+    // Reads the attached file to fill in the form. password is only needed for a locked PDF.
+    suspend fun read(file: Uri, password: String?): PayslipRead = PayslipReader.read(app, file, password)
 
     // Whether that month already has a salary income, so the payslip should not add another.
     fun hasSalary(month: YearMonth): Flow<Boolean> = app.repository.observeHasSalary(month)

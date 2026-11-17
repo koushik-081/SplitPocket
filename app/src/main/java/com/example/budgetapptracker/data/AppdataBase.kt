@@ -19,7 +19,7 @@ import com.example.budgetapptracker.backup.BackupDao
         BillEntity::class,
         PayslipEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -162,6 +162,14 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `kind` TEXT")
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `payee` TEXT")
+            }
+        }
+
+        // Provident fund and tax kept separately on each payslip.
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `payslips` ADD COLUMN `pfPaise` INTEGER")
+                db.execSQL("ALTER TABLE `payslips` ADD COLUMN `taxPaise` INTEGER")
             }
         }
     }

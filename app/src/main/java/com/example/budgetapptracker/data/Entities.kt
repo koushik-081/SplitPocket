@@ -159,4 +159,7 @@ data class PayslipEntity(
     val fileName: String? = null,
     val fileType: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    // Parts of deductionsPaise, when known: provident fund, and income tax plus professional tax.
+    val pfPaise: Long? = null,
+    val taxPaise: Long? = null,
 )

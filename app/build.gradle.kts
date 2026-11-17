@@ -64,6 +64,9 @@ android {
 dependencies {
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.play.services.code.scanner)
+    // Reading payslips on the phone: text from PDFs, and text from photos or scanned pages.
+    implementation(libs.pdfbox.android)
+    implementation(libs.play.services.text.recognition)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.compose.material.icons.core)

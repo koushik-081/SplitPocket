@@ -83,6 +83,7 @@ object BackupCodec {
                 .put("grossPaise", it.grossPaise).put("deductionsPaise", it.deductionsPaise)
                 .put("netPaise", it.netPaise).putOpt("fileName", it.fileName)
                 .putOpt("fileType", it.fileType).put("createdAt", it.createdAt)
+                .putOpt("pfPaise", it.pfPaise).putOpt("taxPaise", it.taxPaise)
         })
         .put("payslipFiles", JSONObject().also { files ->
             data.payslipFiles.forEach { (name, bytes) ->
@@ -175,6 +176,8 @@ object BackupCodec {
                     netPaise = it.getLong("netPaise"),
                     fileName = it.textOrNull("fileName"),
                     fileType = it.textOrNull("fileType"),
+                    pfPaise = if (it.isNull("pfPaise")) null else it.getLong("pfPaise"),
+                    taxPaise = if (it.isNull("taxPaise")) null else it.getLong("taxPaise"),
                     createdAt = it.getLong("createdAt"),
                 )
             },

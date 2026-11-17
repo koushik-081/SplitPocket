@@ -14,10 +14,14 @@ composeBom = "2026.02.01"
 biometric = "1.1.0"
 fragment = "1.8.9"
 codeScanner = "16.1.0"
+pdfbox = "2.0.27.0"
+textRecognition = "19.0.2"
 glance = "1.1.1"
 
 [libraries]
 play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "codeScanner" }
+pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
+play-services-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "textRecognition" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
