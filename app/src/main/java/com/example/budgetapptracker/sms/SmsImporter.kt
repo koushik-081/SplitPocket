@@ -30,7 +30,7 @@ class SmsImporter(
 
                 val parsed = SmsParser.parse(body) ?: continue
                 val smsKey = "$address|$date|${body.hashCode()}"
-                repository.addSmsExpense(parsed.amountPaise, parsed.merchant, date, smsKey)
+                repository.addSmsExpense(parsed.amountPaise, parsed.merchant, date, smsKey, parsed.payee)
                     ?.let { added += it }
             }
         }

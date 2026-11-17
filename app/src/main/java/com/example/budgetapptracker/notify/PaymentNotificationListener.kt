@@ -32,6 +32,7 @@ class PaymentNotificationListener : NotificationListenerService() {
                 amountPaise = payment.amountPaise,
                 merchant = payment.merchant,
                 occurredAt = sbn.postTime,
+                payee = payment.payee,
             ) ?: return@launch
             val envelopes = app.repository.observeEnvelopes(YearMonth.now()).first()
             ExpenseNotifier.show(this@PaymentNotificationListener, expense, envelopes)

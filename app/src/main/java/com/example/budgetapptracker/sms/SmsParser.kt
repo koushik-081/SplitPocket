@@ -2,7 +2,8 @@ package com.example.budgetapptracker.sms
 
 import com.example.budgetapptracker.util.rupeesToPaise
 
-data class ParsedDebit(val amountPaise: Long, val merchant: String)
+// payee: PERSON or MERCHANT when it can be told (see MerchantCategories), otherwise null.
+data class ParsedDebit(val amountPaise: Long, val merchant: String, val payee: String? = null)
 
 object SmsParser {
     private val debitWords =
@@ -18,6 +19,9 @@ object SmsParser {
 
     private val amountAfterDebited =
         Regex("""debited (?:by|for|with)\s+([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE)
+
+    // Banks such as Axis write UPI/P2M/... for a shop and UPI/P2A/... for a person's account.
+    private val upiPayeeType = Regex("""UPI/P2([MA])/""", RegexOption.IGNORE_CASE)
 
     private val merchantPatterns = listOf(
         Regex("""UPI/P2[MA]/\d+/([^./\n]{2,40})""", RegexOption.IGNORE_CASE),
@@ -41,6 +45,11 @@ object SmsParser {
             ?.takeIf { it.isNotBlank() }
             ?: "Unknown"
 
-        return ParsedDebit(amountPaise, merchant.uppercase())
+        val payee = when (upiPayeeType.find(body)?.groupValues?.get(1)?.uppercase()) {
+            "M" -> PAYEE_MERCHANT
+            "A" -> PAYEE_PERSON
+            else -> MerchantCategories.payeeOf(merchant)
+        }
+        return ParsedDebit(amountPaise, merchant.uppercase(), payee)
     }
 }

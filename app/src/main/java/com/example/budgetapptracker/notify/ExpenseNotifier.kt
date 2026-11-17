@@ -13,6 +13,9 @@ import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.TransactionEntity
 import com.example.budgetapptracker.util.toRupeeString
 import com.example.budgetapptracker.MainActivity
+import com.example.budgetapptracker.sms.KIND_INVESTMENT
+import com.example.budgetapptracker.sms.KIND_TRANSFER
+import com.example.budgetapptracker.sms.MerchantCategories
 
 private const val CHANNEL_ID = "captured_expenses"
 private const val MAX_BUTTONS = 3
@@ -21,6 +24,8 @@ const val EXTRA_TRANSACTION_ID = "transaction_id"
 const val EXTRA_MERCHANT = "merchant"
 const val EXTRA_CATEGORY_ID = "category_id"
 const val EXTRA_NOTIFICATION_ID = "notification_id"
+// Set on the "Undo" button of a payment that was filed without asking.
+const val EXTRA_UNDO = "undo"
 
 // Shows a notification for an expense that was picked up from a bank SMS.
 object ExpenseNotifier {
@@ -45,23 +50,43 @@ object ExpenseNotifier {
             .putExtra(EXTRA_TRANSACTION_ID, expense.id)
         val openApp = PendingIntent.getActivity(context, notificationId, openExpense, flags)
 
-        // A remembered payee is already in its envelope; anything else needs a choice.
+        // A remembered payee or a reliable guess is already filed; anything else needs a choice.
         val assigned = envelopes.firstOrNull { it.id == expense.categoryId }
+        val movedNotSpent = when (expense.kind) {
+            KIND_INVESTMENT -> "Saved as an investment, not counted as spending"
+            KIND_TRANSFER -> "Saved as a transfer to your own account, not spending"
+            else -> null
+        }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("${expense.amountPaise.toRupeeString()} at ${expense.merchant}")
             .setContentText(
-                if (assigned != null) "Added to ${assigned.name}"
-                else "Tap to choose from all your envelopes"
+                when {
+                    movedNotSpent != null -> movedNotSpent
+                    assigned != null -> "Added to ${assigned.name}"
+                    else -> "Tap to choose from all your envelopes"
+                }
             )
             .setContentIntent(openApp)
             .setAutoCancel(true)
 
-        if (assigned == null) {
-            // One button per envelope, most-used first. Android shows at most three.
+        if (assigned != null || movedNotSpent != null) {
+            // Filed without asking: one tap puts it back in the Inbox to sort by hand.
+            val undo = Intent(context, NotificationActionReceiver::class.java)
+                .putExtra(EXTRA_TRANSACTION_ID, expense.id)
+                .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                .putExtra(EXTRA_UNDO, true)
+            builder.addAction(
+                0,
+                "Undo",
+                PendingIntent.getBroadcast(context, (expense.id + "undo").hashCode(), undo, flags),
+            )
+        } else {
+            // One button per envelope: the best guess first, then the most-used. Android shows three.
+            val guessed = MerchantCategories.guess(expense.merchant, expense.payee, envelopes)?.envelopeId
             envelopes
-                .sortedByDescending { it.spentPaise }
+                .sortedWith(compareByDescending<EnvelopeSummary> { it.id == guessed }.thenByDescending { it.spentPaise })
                 .take(MAX_BUTTONS)
                 .forEach { envelope ->
                     val choose = Intent(context, NotificationActionReceiver::class.java)

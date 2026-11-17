@@ -99,6 +99,8 @@ import com.example.budgetapptracker.ui.bills.BillsCard
 import com.example.budgetapptracker.ui.recap.RecapCard
 import com.example.budgetapptracker.ui.payslips.PayslipsSheet
 import com.example.budgetapptracker.ui.capture.PaymentCaptureSection
+import com.example.budgetapptracker.ui.sort.SortBanner
+import com.example.budgetapptracker.ui.sort.SortSettingsSection
 
 private val monthTitleFormat = DateTimeFormatter.ofPattern("MMMM yyyy")
 
@@ -369,6 +371,7 @@ private fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { Header(userName = userName, onOpenSettings = onOpenSettings) }
+            item { SortBanner() }
             item { RecapCard() }
             item {
                 HeroCard(
@@ -536,6 +539,7 @@ private fun SettingsDialog(
                     )
                 }
                 PaymentCaptureSection()
+                SortSettingsSection()
                 BackupSection()
             }
         },

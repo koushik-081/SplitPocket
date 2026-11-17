@@ -54,6 +54,10 @@
         <receiver
             android:name=".notify.NotificationActionReceiver"
             android:exported="false" />
+        <!-- Woken by the 9 PM alarm when the evening sorting reminder is switched on. -->
+        <receiver
+            android:name=".notify.SortReminderReceiver"
+            android:exported="false" />
         <!-- The home-screen widget showing what is left to spend. -->
         <receiver
             android:name=".widget.BudgetWidgetReceiver"

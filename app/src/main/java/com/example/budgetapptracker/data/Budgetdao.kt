@@ -35,6 +35,10 @@ data class TransactionRow(
     val paidPaise: Long?,
     // How many people owe you for this expense. Above zero means the split can be undone.
     val splitCount: Int,
+    // TRANSFER, INVESTMENT or LENT for hidden payments that are not spending; otherwise null.
+    val kind: String? = null,
+    // PERSON or MERCHANT when known.
+    val payee: String? = null,
 )
 
 data class PersonBalance(
@@ -250,8 +254,37 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     )
     suspend fun excludeSmsTransaction(id: String)
 
-    @Query("UPDATE transactions SET excluded = 0 WHERE id = :id")
+    @Query("UPDATE transactions SET excluded = 0, kind = NULL WHERE id = :id")
     suspend fun restoreTransaction(id: String)
+
+    @Query("SELECT kind FROM transactions WHERE id = :id")
+    suspend fun kindOf(id: String): String?
+
+    // Marks a payment as money moved rather than spent. It leaves every total, like "Not an expense".
+    @Query("UPDATE transactions SET excluded = 1, categoryId = NULL, kind = :kind WHERE id = :id")
+    suspend fun markKind(id: String, kind: String)
+
+    // Puts an automatically filed payment back to "no envelope", so it shows up for sorting.
+    @Query("UPDATE transactions SET categoryId = NULL, excluded = 0, kind = NULL WHERE id = :id")
+    suspend fun unfile(id: String)
+
+    // Expenses still waiting for an envelope since a given time, for the evening reminder.
+    @Query(
+        """
+        SELECT COUNT(*) FROM transactions
+        WHERE categoryId IS NULL AND excluded = 0 AND occurredAt >= :since
+        """
+    )
+    suspend fun countUnsorted(since: Long): Int
+
+    // Total of one kind of non-spending (for example INVESTMENT) in a period.
+    @Query(
+        """
+        SELECT COALESCE(SUM(amountPaise), 0) FROM transactions
+        WHERE kind = :kind AND occurredAt >= :from AND occurredAt < :until
+        """
+    )
+    fun observeKindTotal(kind: String, from: Long, until: Long): Flow<Long>
     // Shrinks an expense to your own share and remembers the full amount that was paid.
     // Does nothing if the expense has been split before. Returns how many rows changed.
     @Query(
@@ -299,7 +332,7 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
     @Query(
         """
         SELECT id FROM transactions
-        WHERE smsKey IS NULL AND excluded = 0
+        WHERE smsKey IS NULL AND (excluded = 0 OR kind IS NOT NULL)
           AND (amountPaise = :amountPaise OR paidPaise = :amountPaise)
           AND occurredAt >= :from AND occurredAt <= :until
         ORDER BY occurredAt DESC LIMIT 1
@@ -384,7 +417,8 @@ fun observeDebts(personId: String): Flow<List<DebtRow>>
                c.name AS categoryName,
                EXISTS(SELECT 1 FROM merchant_rules r WHERE r.merchant = UPPER(t.merchant)) AS remembered,
                t.paidPaise,
-               (SELECT COUNT(*) FROM debts d WHERE d.expenseId = t.id) AS splitCount
+               (SELECT COUNT(*) FROM debts d WHERE d.expenseId = t.id) AS splitCount,
+               t.kind, t.payee
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.categoryId
         WHERE t.occurredAt >= :from AND t.occurredAt < :until

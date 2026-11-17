@@ -43,6 +43,11 @@ data class TransactionEntity(
     @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
     // What actually left your account, when that differs from your own share (a split bill).
     val paidPaise: Long? = null,
+    // Money that left the account but is not spending: TRANSFER, INVESTMENT or LENT.
+    // Always saved together with excluded = true, so totals already leave it out.
+    val kind: String? = null,
+    // Who was paid, when known: PERSON or MERCHANT (from the bank's P2A / P2M, or a guess).
+    val payee: String? = null,
 )
 
 @Entity(tableName = "incomes")

@@ -29,6 +29,8 @@ data class MonthRecap(
     // Spending in the month before, for a comparison; null when there was none.
     val previousSpentPaise: Long?,
     val budgetSuggestions: List<BudgetSuggestion>,
+    // Put into mutual funds, stocks and the like: money saved, so it is not in spentPaise.
+    val investedPaise: Long = 0,
 ) {
     // Positive: money left in the envelopes. Negative: spent more than was set aside.
     val savedPaise: Long get() = allocatedPaise - spentPaise

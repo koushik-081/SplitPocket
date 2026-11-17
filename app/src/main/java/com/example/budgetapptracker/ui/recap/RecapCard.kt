@@ -70,6 +70,7 @@ private fun RecapContent(
             Line("Spent", recap.spentPaise.toRupeeString() +
                 if (recap.allocatedPaise > 0) " of ${recap.allocatedPaise.toRupeeString()}" else "")
             if (recap.incomePaise > 0) Line("Income", recap.incomePaise.toRupeeString())
+            if (recap.investedPaise > 0) Line("Invested", recap.investedPaise.toRupeeString())
             recap.previousSpentPaise?.let { before ->
                 val change = (recap.spentPaise - before) * 100 / before
                 val previous = recap.month.minusMonths(1).month.getDisplayName(TextStyle.FULL, Locale.getDefault())

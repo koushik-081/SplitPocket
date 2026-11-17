@@ -10,6 +10,7 @@ import com.example.budgetapptracker.data.BudgetRepository
 import com.example.budgetapptracker.data.MonthRecap
 import com.example.budgetapptracker.data.UserPrefs
 import com.example.budgetapptracker.data.buildRecap
+import com.example.budgetapptracker.sms.KIND_INVESTMENT
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,11 +37,13 @@ class RecapViewModel(
             repository.observeEnvelopes(lastMonth),
             repository.observeTransactions(lastMonth, categoryId = null, uncategorisedOnly = false),
             repository.observeTransactions(lastMonth.minusMonths(1), categoryId = null, uncategorisedOnly = false),
-            userPrefs.recapDismissedMonth,
-        ) { income, envelopes, expenses, before, dismissed ->
+            // Two values in one, because combine takes at most five flows.
+            combine(userPrefs.recapDismissedMonth, repository.observeKindTotal(lastMonth, KIND_INVESTMENT)) { d, i -> d to i },
+        ) { income, envelopes, expenses, before, (dismissed, invested) ->
             val showNow = LocalDate.now().dayOfMonth <= SHOW_FOR_DAYS
             if (!showNow || dismissed == lastMonth.toString() || expenses.isEmpty()) null
             else buildRecap(lastMonth, income, envelopes, expenses, before.sumOf { it.amountPaise })
+                .copy(investedPaise = invested)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     // Turns a tracking-only envelope into a budgeted one. The recap updates by itself,

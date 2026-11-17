@@ -19,7 +19,7 @@ import com.example.budgetapptracker.backup.BackupDao
         BillEntity::class,
         PayslipEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -154,6 +154,14 @@ abstract class AppDatabase : RoomDatabase() {
                             "`createdAt` INTEGER NOT NULL, " +
                             "PRIMARY KEY(`id`))"
                 )
+            }
+        }
+
+        // What kind of non-spending a hidden payment is, and whether a person or a shop was paid.
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `kind` TEXT")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `payee` TEXT")
             }
         }
     }

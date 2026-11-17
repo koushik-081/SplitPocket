@@ -1,8 +1,11 @@
 package com.example.budgetapptracker.data
 
+import com.example.budgetapptracker.sms.KIND_LENT
+import com.example.budgetapptracker.sms.MerchantCategories
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 // How far apart an expense and its bank SMS can be and still count as the same payment.
@@ -16,7 +19,14 @@ private const val JUST_PAID_MILLIS = 10 * 60 * 1_000L
 // How long ago a captured payment can be and still be the one that paid back a debt.
 private const val SETTLE_LOOK_BACK_MILLIS = 24 * 60 * 60 * 1_000L
 private const val BILL_LOOK_BACK_MILLIS = 125L * 24 * 60 * 60 * 1_000
-class BudgetRepository(private val dao: BudgetDao) {
+// The two settings that decide whether a new payment is filed without asking.
+data class AutoFileSettings(val enabled: Boolean = false, val ownNames: List<String> = emptyList())
+
+class BudgetRepository(
+    private val dao: BudgetDao,
+    // Read fresh for every captured payment, so a change in Settings applies at once.
+    private val autoFileSettings: () -> AutoFileSettings = { AutoFileSettings() },
+) {
 
     fun observeEnvelopes(month: YearMonth): Flow<List<EnvelopeSummary>> {
         val (from, until) = month.toEpochRange()
@@ -91,6 +101,7 @@ class BudgetRepository(private val dao: BudgetDao) {
         merchant: String,
         occurredAt: Long,
         smsKey: String,
+        payee: String? = null,
     ): TransactionEntity? {
         if (dao.countSmsKey(smsKey) > 0) return null
 
@@ -105,13 +116,16 @@ class BudgetRepository(private val dao: BudgetDao) {
             dao.linkSms(existing, smsKey)
             return null
         }
-        val expense = TransactionEntity(
-            amountPaise = amountPaise,
-            categoryId = dao.findRuleCategory(merchant.uppercase()),
-            merchant = merchant,
-            occurredAt = occurredAt,
-            source = "SMS",
-            smsKey = smsKey,
+        val expense = filed(
+            TransactionEntity(
+                amountPaise = amountPaise,
+                categoryId = null,
+                merchant = merchant,
+                occurredAt = occurredAt,
+                source = "SMS",
+                smsKey = smsKey,
+                payee = payee,
+            )
         )
         return expense.takeIf { dao.insertTransactionIfNew(it) != -1L }
     }
@@ -122,6 +136,7 @@ class BudgetRepository(private val dao: BudgetDao) {
         amountPaise: Long,
         merchant: String,
         occurredAt: Long,
+        payee: String? = null,
     ): TransactionEntity? {
         val existing = dao.findSameAmountNear(
             amountPaise = amountPaise,
@@ -130,12 +145,15 @@ class BudgetRepository(private val dao: BudgetDao) {
         )
         if (existing != null) return null
 
-        val expense = TransactionEntity(
-            amountPaise = amountPaise,
-            categoryId = dao.findRuleCategory(merchant.uppercase()),
-            merchant = merchant,
-            occurredAt = occurredAt,
-            source = "APP",
+        val expense = filed(
+            TransactionEntity(
+                amountPaise = amountPaise,
+                categoryId = null,
+                merchant = merchant,
+                occurredAt = occurredAt,
+                source = "APP",
+                payee = payee,
+            )
         )
         dao.insertTransaction(expense)
         return expense
@@ -158,7 +176,75 @@ class BudgetRepository(private val dao: BudgetDao) {
     }
 
     suspend fun restoreTransaction(id: String) {
+        // A loan made from this payment is undone with it.
+        if (dao.kindOf(id) == KIND_LENT) dao.deleteSplitDebts(id)
         dao.restoreTransaction(id)
+    }
+
+    // Decides where a newly captured payment goes:
+    // 1. your own "Remember" rule for this payee, always;
+    // 2. otherwise, when auto-filing is on, a reliable guess (a known brand, an investment,
+    //    or a transfer to your own name);
+    // 3. otherwise no envelope, so it waits in the Inbox for you to sort.
+    private suspend fun filed(expense: TransactionEntity): TransactionEntity {
+        dao.findRuleCategory(expense.merchant.uppercase())?.let { return expense.copy(categoryId = it) }
+        val settings = autoFileSettings()
+        if (!settings.enabled) return expense
+        val envelopes = observeEnvelopes(YearMonth.now()).first()
+        val guess = MerchantCategories.guess(expense.merchant, expense.payee, envelopes, settings.ownNames)
+        return when {
+            guess == null || !guess.confident -> expense
+            guess.kind != null -> expense.copy(kind = guess.kind, excluded = true)
+            else -> expense.copy(categoryId = guess.envelopeId)
+        }
+    }
+
+    // The best guess for a payment already saved, for showing the likely envelope first.
+    suspend fun guessFor(merchant: String, payee: String?) =
+        MerchantCategories.guess(
+            merchant,
+            payee,
+            observeEnvelopes(YearMonth.now()).first(),
+            autoFileSettings().ownNames,
+        )
+
+    // Everything still without an envelope from the start of last month, newest first.
+    fun observeUnsorted(): Flow<List<TransactionRow>> {
+        val from = YearMonth.now().minusMonths(1).toEpochRange().first
+        val until = YearMonth.now().toEpochRange().second
+        return dao.observeTransactions(from, until, categoryId = null, uncategorisedOnly = true, hidden = false)
+    }
+
+    suspend fun countUnsorted(): Int =
+        dao.countUnsorted(YearMonth.now().minusMonths(1).toEpochRange().first)
+
+    // Money moved rather than spent: TRANSFER or INVESTMENT. It leaves every total.
+    suspend fun markKind(id: String, kind: String) {
+        dao.markKind(id, kind)
+    }
+
+    // Undo for an automatically filed payment: back to "no envelope".
+    suspend fun unfile(id: String) {
+        dao.unfile(id)
+    }
+
+    // You paid this to lend it: the person owes you the whole amount, and it is not your spending.
+    suspend fun lend(transactionId: String, personId: String, amountPaise: Long, merchant: String) {
+        dao.insertDebt(
+            DebtEntity(personId = personId, amountPaise = amountPaise, note = "Lent · $merchant", expenseId = transactionId)
+        )
+        dao.markKind(transactionId, KIND_LENT)
+    }
+
+    // You paid this to pay back what you owed: your balance with them moves by this amount.
+    // The payment itself stays, so it can still go into an envelope like other settle-ups.
+    suspend fun paidBack(personId: String, amountPaise: Long) {
+        dao.insertDebt(DebtEntity(personId = personId, amountPaise = amountPaise, note = "Paid back"))
+    }
+
+    fun observeKindTotal(month: YearMonth, kind: String): Flow<Long> {
+        val (from, until) = month.toEpochRange()
+        return dao.observeKindTotal(kind, from, until)
     }
 
     suspend fun removeTransaction(id: String) {

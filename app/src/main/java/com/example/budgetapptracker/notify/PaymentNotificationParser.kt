@@ -1,5 +1,6 @@
 package com.example.budgetapptracker.notify
 
+import com.example.budgetapptracker.sms.MerchantCategories
 import com.example.budgetapptracker.sms.ParsedDebit
 import com.example.budgetapptracker.util.rupeesToPaise
 
@@ -45,6 +46,6 @@ object PaymentNotificationParser {
         val name = payee.find(message)?.groupValues?.get(1)?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: "Unknown"
-        return ParsedDebit(amountPaise, name.uppercase())
+        return ParsedDebit(amountPaise, name.uppercase(), MerchantCategories.payeeOf(name))
     }
 }

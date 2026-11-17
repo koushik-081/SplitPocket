@@ -46,6 +46,11 @@ import com.example.budgetapptracker.ui.transactions.TransactionsScreen
 import androidx.compose.material.icons.rounded.Group
 import com.example.budgetapptracker.ui.people.PeopleScreen
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.budgetapptracker.ui.sort.SortViewModel
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
@@ -61,6 +66,9 @@ fun AppRoot(
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var pendingAction by remember { mutableStateOf<HomeAction?>(null) }
+    // Expenses still without an envelope, shown as a number on the Activity tab.
+    val sortViewModel: SortViewModel = viewModel(factory = SortViewModel.Factory)
+    val unsortedCount = sortViewModel.unsorted.collectAsStateWithLifecycle().value?.size ?: 0
 
     // A tapped notification jumps to Activity, which then opens that expense.
     LaunchedEffect(expenseToOpen) {
@@ -73,6 +81,7 @@ fun AppRoot(
         bottomBar = {
             BottomBar(
                 selected = tab,
+                activityBadge = unsortedCount,
                 onSelect = { tab = it },
                 onAction = { action ->
                     tab = Tab.Home
@@ -103,6 +112,7 @@ fun AppRoot(
 @Composable
 private fun BottomBar(
     selected: Tab,
+    activityBadge: Int,
     onSelect: (Tab) -> Unit,
     onAction: (HomeAction) -> Unit,
 ) {
@@ -122,6 +132,7 @@ private fun BottomBar(
                 tab = Tab.Activity,
                 selected = selected == Tab.Activity,
                 onClick = { onSelect(Tab.Activity) },
+                badge = activityBadge,
             )
 
             Box {
@@ -166,7 +177,7 @@ private fun BottomBar(
 }
 
 @Composable
-private fun BarItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
+private fun BarItem(tab: Tab, selected: Boolean, onClick: () -> Unit, badge: Int = 0) {
     val color = if (selected) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -177,7 +188,13 @@ private fun BarItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(imageVector = tab.icon, contentDescription = null, tint = color)
+        BadgedBox(
+            badge = {
+                if (badge > 0) Badge { Text(if (badge > 99) "99+" else badge.toString()) }
+            },
+        ) {
+            Icon(imageVector = tab.icon, contentDescription = null, tint = color)
+        }
         Text(text = tab.label, color = color, style = MaterialTheme.typography.labelMedium)
     }
 }

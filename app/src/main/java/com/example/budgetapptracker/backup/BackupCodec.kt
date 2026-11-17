@@ -48,6 +48,7 @@ object BackupCodec {
                 .put("note", it.note).put("occurredAt", it.occurredAt).put("source", it.source)
                 .putOpt("smsKey", it.smsKey).put("excluded", it.excluded)
                 .putOpt("paidPaise", it.paidPaise)
+                .putOpt("kind", it.kind).putOpt("payee", it.payee)
         })
         .put("incomes", data.incomes.toArray {
             JSONObject().put("id", it.id).put("amountPaise", it.amountPaise)
@@ -114,6 +115,8 @@ object BackupCodec {
                     smsKey = it.textOrNull("smsKey"),
                     excluded = it.optBoolean("excluded", false),
                     paidPaise = if (it.isNull("paidPaise")) null else it.getLong("paidPaise"),
+                    kind = it.textOrNull("kind"),
+                    payee = it.textOrNull("payee"),
                 )
             },
             incomes = root.list("incomes") {

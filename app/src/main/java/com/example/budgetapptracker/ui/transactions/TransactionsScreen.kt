@@ -62,6 +62,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.budgetapptracker.data.EnvelopeSummary
 import com.example.budgetapptracker.data.PersonBalance
 import com.example.budgetapptracker.data.SplitMode
+import com.example.budgetapptracker.sms.KIND_INVESTMENT
+import com.example.budgetapptracker.sms.KIND_LENT
+import com.example.budgetapptracker.sms.KIND_TRANSFER
 import com.example.budgetapptracker.data.planShares
 import com.example.budgetapptracker.data.TransactionRow
 import com.example.budgetapptracker.ui.theme.transparentTopBarColors
@@ -228,7 +231,13 @@ viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Fac
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             headlineContent = { Text(transaction.merchant) },
                             supportingContent = {
-                                Text("${transaction.categoryName ?: "Uncategorised"} · ${transaction.occurredAt.toDateText()}")
+                                val label = when (transaction.kind) {
+                                    KIND_INVESTMENT -> "Investment"
+                                    KIND_TRANSFER -> "Transfer to own account"
+                                    KIND_LENT -> "Lent"
+                                    else -> transaction.categoryName ?: "Uncategorised"
+                                }
+                                Text("$label · ${transaction.occurredAt.toDateText()}")
                             },
                             trailingContent = {
                                 Text(
@@ -398,8 +407,9 @@ private fun AssignDialog(
 }
 
 // Choose who shared an expense you have already paid, and how it is divided.
+// internal: the sorting sheet uses it too.
 @Composable
-private fun SplitDialog(
+internal fun SplitDialog(
     transaction: TransactionRow,
     people: List<PersonBalance>,
     onDismiss: () -> Unit,
