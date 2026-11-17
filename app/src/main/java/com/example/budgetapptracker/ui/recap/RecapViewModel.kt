@@ -16,11 +16,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 // How many days into a new month the recap of the last one stays on Home.
 private const val SHOW_FOR_DAYS = 7
 
-class RecapViewModel(repository: BudgetRepository, private val userPrefs: UserPrefs) : ViewModel() {
+class RecapViewModel(
+    private val repository: BudgetRepository,
+    private val userPrefs: UserPrefs,
+) : ViewModel() {
 
     private val lastMonth = YearMonth.now().minusMonths(1)
 
@@ -39,6 +43,11 @@ class RecapViewModel(repository: BudgetRepository, private val userPrefs: UserPr
             else buildRecap(lastMonth, income, envelopes, expenses, before.sumOf { it.amountPaise })
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    // Turns a tracking-only envelope into a budgeted one. The recap updates by itself,
+    // because the envelope now has a budget and drops out of the suggestions.
+    fun setBudget(categoryId: String, budgetPaise: Long) {
+        viewModelScope.launch { repository.updateBudget(categoryId, budgetPaise) }
+    }
     fun dismiss() {
         userPrefs.dismissRecap(lastMonth.toString())
     }

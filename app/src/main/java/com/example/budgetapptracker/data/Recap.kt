@@ -4,6 +4,15 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 
+// A tracking-only envelope (no limit) that had spending last month, with a budget to suggest.
+data class BudgetSuggestion(
+    val categoryId: String,
+    val name: String,
+    val spentPaise: Long,
+) {
+    // Rounded up to the next ₹100, so the suggestion is a friendly number.
+    val suggestedPaise: Long get() = (spentPaise + 9_999) / 10_000 * 10_000
+}
 // A finished month in a few numbers, for the recap card at the start of the next month.
 data class MonthRecap(
     val month: YearMonth,
@@ -19,6 +28,7 @@ data class MonthRecap(
     val noSpendDays: Int,
     // Spending in the month before, for a comparison; null when there was none.
     val previousSpentPaise: Long?,
+    val budgetSuggestions: List<BudgetSuggestion>,
 ) {
     // Positive: money left in the envelopes. Negative: spent more than was set aside.
     val savedPaise: Long get() = allocatedPaise - spentPaise
@@ -50,5 +60,9 @@ fun buildRecap(
             .maxByOrNull { it.second },
         noSpendDays = month.lengthOfMonth() - spendDays.size,
         previousSpentPaise = previousSpentPaise.takeIf { it > 0 },
+        budgetSuggestions = envelopes
+            .filter { !it.hasBudget && it.spentPaise > 0 }
+            .sortedByDescending { it.spentPaise }
+            .map { BudgetSuggestion(it.id, it.name, it.spentPaise) },
     )
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,11 +30,15 @@ import kotlin.math.abs
 @Composable
 fun RecapCard(viewModel: RecapViewModel = viewModel(factory = RecapViewModel.Factory)) {
     val recap by viewModel.recap.collectAsStateWithLifecycle()
-    recap?.let { RecapContent(it, onDismiss = viewModel::dismiss) }
+    recap?.let { RecapContent(it, onDismiss = viewModel::dismiss, onSetBudget = viewModel::setBudget) }
 }
 
 @Composable
-private fun RecapContent(recap: MonthRecap, onDismiss: () -> Unit) {
+private fun RecapContent(
+    recap: MonthRecap,
+    onDismiss: () -> Unit,
+    onSetBudget: (categoryId: String, budgetPaise: Long) -> Unit,
+) {
     val colors = LocalAppColors.current
     val monthName = recap.month.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
     // The theme's main colour for good news, its error colour for overspending.
@@ -80,6 +85,31 @@ private fun RecapContent(recap: MonthRecap, onDismiss: () -> Unit) {
             recap.topPayee?.let { (name, paise) -> Line("Most paid to", "$name · ${paise.toRupeeString()}") }
             recap.biggest?.let { Line("Biggest expense", "${it.amountPaise.toRupeeString()} at ${it.merchant}") }
             Line("No-spend days", recap.noSpendDays.toString())
+
+            if (recap.budgetSuggestions.isNotEmpty()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                Text("Ready for a budget?", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "You tracked these without a limit. Set last month's spending as the budget?",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                recap.budgetSuggestions.forEach { s ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(s.name)
+                            Text(
+                                "Spent ${s.spentPaise.toRupeeString()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = { onSetBudget(s.categoryId, s.suggestedPaise) }) {
+                            Text("Set ${s.suggestedPaise.toRupeeString()}")
+                        }
+                    }
+                }
+            }
         }
     }
 }
