@@ -14,6 +14,11 @@ data class EnvelopeSummary(
     val spentPaise: Long,
 ) {
     val remainingPaise: Long get() = monthlyBudgetPaise - spentPaise
+
+    /** False for a tracking-only envelope: no limit, just a running total. */
+    val hasBudget: Boolean get() = monthlyBudgetPaise > 0
+
+    val isOverBudget: Boolean get() = hasBudget && remainingPaise < 0
 }
 
 data class TransactionRow(

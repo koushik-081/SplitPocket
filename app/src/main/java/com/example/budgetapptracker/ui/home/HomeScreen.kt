@@ -299,6 +299,7 @@ fun HomeScreen(
         EntryDialog(
             title = "New envelope",
             textLabel = "Name (e.g. Food)",
+            amountOptional = true,
             onDismiss = { showAddEnvelope = false },
             onConfirm = { name, paise ->
                 viewModel.addCategory(name, paise)
@@ -335,6 +336,7 @@ fun HomeScreen(
         EntryDialog(
             title = "Budget for ${target.name}",
             textLabel = null,
+            amountOptional = true,
             onDismiss = { budgetTarget = null },
             onConfirm = { _, paise ->
                 viewModel.updateBudget(target.id, paise)
@@ -794,8 +796,8 @@ private fun EnvelopeTile(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val overspent = envelope.remainingPaise < 0
-    val fraction = if (envelope.monthlyBudgetPaise == 0L) 0f
+    val overspent = envelope.isOverBudget
+    val fraction = if (!envelope.hasBudget) 0f
     else (envelope.spentPaise.toFloat() / envelope.monthlyBudgetPaise).coerceIn(0f, 1f)
 
     Card(
@@ -839,8 +841,11 @@ private fun EnvelopeTile(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (overspent) "Over by ${(-envelope.remainingPaise).toShortRupees()}"
-                else "${envelope.remainingPaise.toShortRupees()} left",
+                text = when {
+                    !envelope.hasBudget -> "${envelope.spentPaise.toShortRupees()} spent"
+                    overspent -> "Over by ${(-envelope.remainingPaise).toShortRupees()}"
+                    else -> "${envelope.remainingPaise.toShortRupees()} left"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (overspent) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -889,10 +894,12 @@ private fun EntryDialog(
     textLabel: String?,
     onDismiss: () -> Unit,
     onConfirm: (String, Long) -> Unit,
+    amountOptional: Boolean = false,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     var amount by rememberSaveable { mutableStateOf("") }
-    val paise = rupeesToPaise(amount)
+    // Blank amount means "no limit" (saved as 0) when the caller allows it.
+    val paise = if (amountOptional && amount.isBlank()) 0L else rupeesToPaise(amount)
     val textOk = textLabel == null || text.isNotBlank()
 
     AlertDialog(
@@ -911,7 +918,10 @@ private fun EntryDialog(
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    label = { Text("Amount (₹)") },
+                    label = { Text(if (amountOptional) "Monthly budget (₹)" else "Amount (₹)") },
+                    supportingText = if (amountOptional) {
+                        { Text("Leave blank to just track spending") }
+                    } else null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )

@@ -95,7 +95,8 @@ fun SpendingBreakdownSheet(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = "of ${row.budgetPaise.toRupeeString()} budget",
+                                text = if (row.budgetPaise > 0) "of ${row.budgetPaise.toRupeeString()} budget"
+                                else "No limit",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

@@ -49,11 +49,11 @@ fun writeMonthPdf(report: MonthReport, out: OutputStream) {
             writer.row(
                 listOf(
                     it.name,
-                    it.monthlyBudgetPaise.toRupeeString(),
+                    if (it.hasBudget) it.monthlyBudgetPaise.toRupeeString() else "No limit",
                     it.spentPaise.toRupeeString(),
-                    it.remainingPaise.toRupeeString(),
+                    if (it.hasBudget) it.remainingPaise.toRupeeString() else "-",
                 ),
-                warn = it.remainingPaise < 0,
+                warn = it.isOverBudget,
                 money = true,
             )
         }

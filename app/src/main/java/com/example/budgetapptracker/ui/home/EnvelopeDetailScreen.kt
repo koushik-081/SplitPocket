@@ -61,8 +61,8 @@ fun EnvelopeDetailScreen(
 ) {
     var pendingRemove by remember { mutableStateOf<TransactionRow?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val overspent = envelope.remainingPaise < 0
-    val fraction = if (envelope.monthlyBudgetPaise == 0L) 0f
+    val overspent = envelope.isOverBudget
+    val fraction = if (!envelope.hasBudget) 0f
     else (envelope.spentPaise.toFloat() / envelope.monthlyBudgetPaise).coerceIn(0f, 1f)
 
     BackHandler(onBack = onBack)
@@ -97,14 +97,21 @@ fun EnvelopeDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = if (overspent) "Over by ${(-envelope.remainingPaise).toRupeeString()}"
-                        else "${envelope.remainingPaise.toRupeeString()} left",
+                        text = when {
+                            !envelope.hasBudget -> "${envelope.spentPaise.toRupeeString()} spent"
+                            overspent -> "Over by ${(-envelope.remainingPaise).toRupeeString()}"
+                            else -> "${envelope.remainingPaise.toRupeeString()} left"
+                        },
                         style = MaterialTheme.typography.headlineMedium,
                         color = if (overspent) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Spent ${envelope.spentPaise.toRupeeString()} of ${envelope.monthlyBudgetPaise.toRupeeString()}",
+                        text = if (envelope.hasBudget) {
+                            "Spent ${envelope.spentPaise.toRupeeString()} of ${envelope.monthlyBudgetPaise.toRupeeString()}"
+                        } else {
+                            "No limit set. Tap Edit budget to add one."
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     LinearProgressIndicator(

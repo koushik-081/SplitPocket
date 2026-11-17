@@ -299,7 +299,7 @@ private fun PaySheet(
                 }
             }
 
-            val after = if (selected != null && amountPaise != null) {
+            val after = if (selected != null && selected.hasBudget && amountPaise != null) {
                 selected.remainingPaise - amountPaise
             } else {
                 null
@@ -307,6 +307,8 @@ private fun PaySheet(
             Text(
                 text = when {
                     selected == null -> "Pick the envelope this payment comes from."
+                    !selected.hasBudget -> "${selected.name} has no limit. " +
+                            "Spent so far this month: ${selected.spentPaise.toRupeeString()}."
                     after == null -> "${selected.name} has ${selected.remainingPaise.toRupeeString()} left."
                     after >= 0 -> "${selected.name} has ${selected.remainingPaise.toRupeeString()} left. " +
                         "After this payment: ${after.toRupeeString()}."
